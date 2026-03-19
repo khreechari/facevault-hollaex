@@ -7,6 +7,14 @@
     "build": "node build.js",
     "build:minify": "node build.js --minify"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/khreechari/facevault-hollaex"
+  },
+  "bugs": {
+    "url": "https://github.com/khreechari/facevault-hollaex/issues"
+  },
+  "homepage": "https://facevault.id/integrations",
   "author": "FaceVault <support@facevault.id>",
   "license": "MIT"
 }
