@@ -1,0 +1,12 @@
+{
+  "name": "facevault-hollaex-plugin",
+  "version": "1.0.0",
+  "description": "FaceVault KYC plugin for HollaEx exchanges",
+  "private": true,
+  "scripts": {
+    "build": "node build.js",
+    "build:minify": "node build.js --minify"
+  },
+  "author": "FaceVault <support@facevault.id>",
+  "license": "MIT"
+}
