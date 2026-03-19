@@ -1,6 +1,6 @@
 # FaceVault KYC Plugin for HollaEx
 
-Self-hosted identity verification for HollaEx-powered exchanges. Replace cloud KYC providers (Sumsub, iDenfy, Onfido) with FaceVault — no per-verification fees, all data stays on your infrastructure.
+AI-powered identity verification for HollaEx-powered exchanges. Replace manual KYC review or cloud providers (Sumsub, iDenfy, Onfido) with FaceVault — flat pricing, no annual contracts, self-hosted option for enterprise.
 
 ## Features
 
@@ -103,7 +103,7 @@ npm run build:minify
 ### Plugin structure
 
 ```
-integrations/hollaex/
+facevault-hollaex/
 ├── config.json         # Plugin metadata & configuration schema
 ├── server.js           # Express routes (session, webhook, status)
 ├── web/views/Main.js   # React component for the verification page
@@ -124,7 +124,7 @@ docker compose up -d
 # e.g., https://kyc.your-exchange.com
 ```
 
-All biometric data, face embeddings, and documents stay on your servers. No cloud dependency.
+With self-hosted FaceVault, all biometric data stays on your servers. No third-party AI APIs (AWS, Google, Azure).
 
 ## License
 

@@ -131,7 +131,7 @@ app.post('/plugins/facevault/session', async (req, res) => {
 
 app.post('/plugins/facevault/webhook', async (req, res) => {
 	try {
-		const signature = req.headers['x-facevault-signature'];
+		const signature = req.headers['x-signature'] || req.headers['x-facevault-signature'];
 		const webhookSecret = meta.webhook_secret.value;
 
 		// Verify HMAC signature

@@ -3,10 +3,10 @@
   "version": 1,
   "type": "kyc",
   "author": "FaceVault",
-  "bio": "Self-hosted identity verification with AI face matching, document OCR, and anti-spoofing.",
-  "description": "Replace cloud KYC providers with FaceVault — a privacy-first, self-hosted identity verification platform. Features include AI-powered face matching (ArcFace), document OCR/MRZ extraction, 15-signal document fraud detection, liveness detection, anti-spoofing, and proof of address verification. No per-verification cloud fees. All biometric data stays on your infrastructure.",
+  "bio": "AI-powered identity verification with face matching, document OCR, and anti-spoofing.",
+  "description": "Replace manual KYC review with FaceVault — AI-powered identity verification. Features include face matching (ArcFace), document OCR/MRZ extraction, 15-signal document fraud detection, liveness detection, anti-spoofing, and proof of address verification. Flat pricing from $0.35/check. Self-hosted option for enterprise.",
   "documentation": "https://facevault.id/docs",
-  "logo": "https://facevault.id/og-facevault.png",
+  "logo": "https://facevault.id/og-card.png",
   "icon": "https://facevault.id/favicon.svg",
   "url": "https://facevault.id",
 
@@ -14,7 +14,7 @@
     "api_key": {
       "type": "string",
       "required": true,
-      "description": "Your FaceVault API key (starts with sk_live_ or sk_test_)",
+      "description": "Your FaceVault API key (starts with fv_live_ or fv_test_)",
       "value": ""
     },
     "api_url": {
