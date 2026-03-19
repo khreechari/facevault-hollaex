@@ -135,6 +135,13 @@ For enterprise operators who need biometric data on their own infrastructure, Fa
 
 Set `api_url` in plugin config to your self-hosted URL (e.g. `https://kyc.your-exchange.com`).
 
+## Verify Download
+
+```bash
+sha256sum facevault-kyc.json
+# d6b804cd6ef1619148c1b829247ce48018edb55d65e16eb840159e64ab15c50e
+```
+
 ## License
 
 MIT
