@@ -12,6 +12,9 @@
  *   publicMeta   — Public plugin config (app_url)
  *   toolsLib     — HollaEx user/admin utility library
  *   loggerPlugin — Plugin logger
+ *
+ * Auth: HollaEx populates req.auth on authenticated plugin routes.
+ * Webhook HMAC: FaceVault sends hex-encoded SHA256 in X-Signature header.
  */
 
 const crypto = require('crypto');
@@ -22,10 +25,12 @@ const http = require('http');
 
 function facevaultRequest(method, path, body) {
 	const apiKey = meta.api_key.value;
+	// String concat, not new URL(), to avoid baseUrl path being dropped
 	const baseUrl = meta.api_url.value.replace(/\/+$/, '');
+	const fullUrl = baseUrl + path;
 
 	return new Promise((resolve, reject) => {
-		const url = new URL(path, baseUrl);
+		const url = new URL(fullUrl);
 		const mod = url.protocol === 'https:' ? https : http;
 
 		const options = {
@@ -53,6 +58,8 @@ function facevaultRequest(method, path, body) {
 		});
 
 		req.on('error', reject);
+		// Timeout destroys the socket; the promise rejects and the route
+		// handler's try/catch returns 500 to the caller.
 		req.setTimeout(15000, () => { req.destroy(); reject(new Error('Request timeout')); });
 
 		if (body) req.write(JSON.stringify(body));
@@ -60,9 +67,15 @@ function facevaultRequest(method, path, body) {
 	});
 }
 
+/**
+ * Verify HMAC-SHA256 signature.
+ * FaceVault sends hex-encoded signatures in the X-Signature header.
+ * Uses timing-safe comparison to prevent timing attacks.
+ */
 function verifyHmac(secret, payload, signature) {
 	if (!secret || !signature) return false;
 	const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+	// Both sides are hex — safe to compare as hex buffers
 	try {
 		return crypto.timingSafeEqual(
 			Buffer.from(expected, 'hex'),
@@ -90,11 +103,6 @@ app.post('/plugins/facevault/session', async (req, res) => {
 			return res.status(400).json({ message: 'Already verified' });
 		}
 
-		// Mark as pending
-		await toolsLib.user.updateUserInfo(user.id, {
-			id_data: { status: 1, note: 'FaceVault verification in progress' }
-		});
-
 		// Build query params
 		const externalId = 'hollaex_' + user.id;
 		let qs = '?external_user_id=' + encodeURIComponent(externalId);
@@ -109,6 +117,11 @@ app.post('/plugins/facevault/session', async (req, res) => {
 			loggerPlugin.error('FaceVault session creation failed:', result.data);
 			return res.status(502).json({ message: 'Failed to create verification session' });
 		}
+
+		// Only mark as pending AFTER successful session creation
+		await toolsLib.user.updateUserInfo(user.id, {
+			id_data: { status: 1, note: 'FaceVault verification in progress' }
+		});
 
 		const sessionData = result.data;
 		const sessionToken = sessionData.session_token;
@@ -128,14 +141,20 @@ app.post('/plugins/facevault/session', async (req, res) => {
 // ─── POST /plugins/facevault/webhook ────────────────────
 // Receives HMAC-signed webhook from FaceVault when verification completes.
 // Updates the HollaEx user's verification level based on the result.
+//
+// HMAC is verified against the raw request body string. HollaEx's plugin
+// runtime provides req.body as a parsed object, so we re-serialize with
+// the same compact format FaceVault uses (sorted keys, no whitespace).
 
 app.post('/plugins/facevault/webhook', async (req, res) => {
 	try {
 		const signature = req.headers['x-signature'] || req.headers['x-facevault-signature'];
 		const webhookSecret = meta.webhook_secret.value;
 
-		// Verify HMAC signature
-		const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+		// Re-serialize to match FaceVault's signing format (compact, sorted keys)
+		const rawBody = typeof req.body === 'string'
+			? req.body
+			: JSON.stringify(req.body, Object.keys(req.body).sort());
 		if (!verifyHmac(webhookSecret, rawBody, signature)) {
 			loggerPlugin.warn('FaceVault webhook: invalid signature');
 			return res.status(401).json({ message: 'Invalid signature' });
@@ -160,12 +179,11 @@ app.post('/plugins/facevault/webhook', async (req, res) => {
 		const status = event.status;
 		const trustScore = event.trust_score;
 		const trustDecision = event.trust_decision;
-		const faceMatch = event.face_match_passed;
 		const confirmedData = event.confirmed_data || {};
 
 		loggerPlugin.info(
-			'FaceVault webhook: user=%d status=%s trust=%s score=%d',
-			userId, status, trustDecision, trustScore
+			'FaceVault webhook: user=%d status=%s trust=%s score=%d face_match=%s',
+			userId, status, trustDecision, trustScore, event.face_match_passed
 		);
 
 		if (status === 'passed' && trustDecision === 'accept') {
