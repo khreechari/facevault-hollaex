@@ -178,6 +178,8 @@ class FaceVaultKYC extends Component {
 		const isVerified = status === 3;
 		const isPending = status === 1;
 		const isRejected = status === 2;
+		// Strip internal timestamp suffix from note before rendering
+		const note = (idData.note || '').replace(/ \[\d{4}-\d{2}-\d{2}T[\d:.]+Z\]$/, '') || null;
 
 		return (
 			<div style={STYLES.container}>
@@ -222,9 +224,9 @@ class FaceVaultKYC extends Component {
 				)}
 
 				{/* Rejected note */}
-				{isRejected && idData.note && (
+				{isRejected && note && (
 					<div style={STYLES.rejectedNote}>
-						{idData.note}
+						{note}
 					</div>
 				)}
 

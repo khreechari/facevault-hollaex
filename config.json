@@ -6,7 +6,7 @@
   "bio": "AI-powered identity verification with face matching, document OCR, and anti-spoofing.",
   "description": "Replace manual KYC review with FaceVault — AI-powered identity verification. Features include face matching (ArcFace), document OCR/MRZ extraction, 15-signal document fraud detection, liveness detection, anti-spoofing, and proof of address verification. Flat pricing from $0.35/check. Self-hosted option for enterprise.",
   "documentation": "https://facevault.id/docs",
-  "logo": "https://facevault.id/og-card.png",
+  "logo": "https://facevault.id/logo-shield.png",
   "icon": "https://facevault.id/favicon.svg",
   "url": "https://facevault.id",
 
