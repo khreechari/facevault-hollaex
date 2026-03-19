@@ -48,7 +48,7 @@ In the HollaEx Operator Control Panel → Plugins → FaceVault KYC:
 
 ### 4. Set up webhook
 
-In your FaceVault dashboard, set the webhook URL to:
+In your FaceVault dashboard ([devdash.facevault.id](https://devdash.facevault.id)), set the webhook URL to:
 
 ```
 https://your-exchange.com/plugins/facevault/webhook

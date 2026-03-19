@@ -20,13 +20,13 @@
     "api_url": {
       "type": "string",
       "required": true,
-      "description": "FaceVault API base URL (e.g. https://facevault.id or your self-hosted URL)",
+      "description": "FaceVault API base URL (default: https://facevault.id — or your self-hosted URL)",
       "value": "https://facevault.id"
     },
     "webhook_secret": {
       "type": "string",
       "required": true,
-      "description": "Webhook signing secret from your FaceVault dashboard",
+      "description": "Webhook signing secret from your FaceVault dashboard (devdash.facevault.id)",
       "value": ""
     },
     "verified_level": {

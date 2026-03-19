@@ -167,6 +167,15 @@ app.post('/plugins/facevault/webhook', async (req, res) => {
 			return res.status(200).json({ message: 'Ignored' });
 		}
 
+		// Replay protection: reject webhooks older than 5 minutes
+		if (event.signed_at) {
+			const age = Date.now() - new Date(event.signed_at).getTime();
+			if (age > 300000) {
+				loggerPlugin.warn('FaceVault webhook: stale signature (age=%dms)', age);
+				return res.status(401).json({ message: 'Stale webhook' });
+			}
+		}
+
 		// Extract HollaEx user ID from external_user_id
 		const externalId = event.external_user_id || '';
 		const match = externalId.match(/^hollaex_(\d+)$/);
