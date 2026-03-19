@@ -26,7 +26,7 @@ Sign up at [devdash.facevault.id](https://devdash.facevault.id). Free tier inclu
 
 **Option A — Upload JSON:**
 
-Download `facevault-kyc.json` from [Releases](https://github.com/khreechari/facevault-hollaex/releases) or build it yourself:
+Download [`facevault-kyc.json`](https://raw.githubusercontent.com/khreechari/facevault-hollaex/main/facevault-kyc.json) or build it yourself:
 
 ```bash
 git clone https://github.com/khreechari/facevault-hollaex.git
