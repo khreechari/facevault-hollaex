@@ -117,9 +117,18 @@ app.post('/plugins/facevault/session', async (req, res) => {
 			return res.status(400).json({ message: 'Already verified' });
 		}
 
-		// Block if already pending — prevents spamming FaceVault sessions
+		// Block if already pending — prevents spamming FaceVault sessions.
+		// Allow retry after 10 minutes to unstick users whose session expired
+		// or who closed the browser before completing verification.
 		if (idData.status === 1) {
-			return res.status(409).json({ message: 'Verification already in progress' });
+			const note = idData.note || '';
+			const tsMatch = note.match(/\[(\d{4}-\d{2}-\d{2}T[\d:.]+Z)\]$/);
+			if (tsMatch) {
+				const age = Date.now() - new Date(tsMatch[1]).getTime();
+				if (age < 600000) {
+					return res.status(409).json({ message: 'Verification already in progress' });
+				}
+			}
 		}
 
 		// Build query params
@@ -137,9 +146,10 @@ app.post('/plugins/facevault/session', async (req, res) => {
 			return res.status(502).json({ message: 'Failed to create verification session' });
 		}
 
-		// Only mark as pending AFTER successful session creation
+		// Only mark as pending AFTER successful session creation.
+		// Timestamp in note enables stale-session detection (10 min TTL).
 		await toolsLib.user.updateUserInfo(user.id, {
-			id_data: { status: 1, note: 'FaceVault verification in progress' }
+			id_data: { status: 1, note: 'FaceVault verification in progress [' + new Date().toISOString() + ']' }
 		});
 
 		const sessionData = result.data;
