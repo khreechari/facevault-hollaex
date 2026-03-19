@@ -129,6 +129,7 @@ app.post('/plugins/facevault/session', async (req, res) => {
 					return res.status(409).json({ message: 'Verification already in progress' });
 				}
 			}
+			// No timestamp = assume stale (e.g. admin-set pending), allow retry
 		}
 
 		// Build query params
@@ -285,10 +286,14 @@ app.get('/plugins/facevault/status', (req, res) => {
 	const idData = user.id_data || {};
 	const statusMap = { 0: 'unverified', 1: 'pending', 2: 'rejected', 3: 'verified' };
 
+	// Strip internal timestamp from note before returning to frontend
+	const rawNote = idData.note || null;
+	const cleanNote = rawNote ? rawNote.replace(/ \[\d{4}-\d{2}-\d{2}T[\d:.]+Z\]$/, '') : null;
+
 	res.json({
 		status: idData.status || 0,
 		label: statusMap[idData.status] || 'unverified',
-		note: idData.note || null,
+		note: cleanNote,
 		verified: idData.status === 3,
 	});
 });
