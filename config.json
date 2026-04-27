@@ -20,8 +20,8 @@
     "api_url": {
       "type": "string",
       "required": true,
-      "description": "FaceVault API base URL (default: https://facevault.id — or your self-hosted URL)",
-      "value": "https://facevault.id"
+      "description": "FaceVault API base URL (default: https://api.facevault.id — or your self-hosted URL)",
+      "value": "https://api.facevault.id"
     },
     "webhook_secret": {
       "type": "string",

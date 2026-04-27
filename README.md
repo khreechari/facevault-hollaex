@@ -48,7 +48,7 @@ In the HollaEx Operator Control Panel → Plugins → FaceVault KYC:
 | Setting | Description |
 |---------|-------------|
 | `api_key` | Your FaceVault API key (`fv_live_...`) |
-| `api_url` | FaceVault API URL (default: `https://facevault.id`) |
+| `api_url` | FaceVault API URL (default: `https://api.facevault.id`) |
 | `webhook_secret` | Webhook signing secret from [devdash.facevault.id](https://devdash.facevault.id) |
 | `verified_level` | HollaEx user level to assign on successful KYC (default: `2`) |
 | `require_poa` | Require proof of address document (default: `false`) |
@@ -139,7 +139,7 @@ Set `api_url` in plugin config to your self-hosted URL (e.g. `https://kyc.your-e
 
 ```bash
 sha256sum facevault-kyc.json
-# d6b804cd6ef1619148c1b829247ce48018edb55d65e16eb840159e64ab15c50e
+# b109c50a7942c6798f5e587063e4f28d64566b2c7eaf8398a04d4fe8c00fac0a
 ```
 
 ## License

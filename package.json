@@ -1,6 +1,6 @@
 {
   "name": "facevault-hollaex-plugin",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "FaceVault KYC plugin for HollaEx exchanges",
   "private": true,
   "scripts": {
@@ -16,5 +16,12 @@
   },
   "homepage": "https://facevault.id/integrations",
   "author": "FaceVault <support@facevault.id>",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@babel/core": "^7.29.0",
+    "@babel/preset-react": "^7.28.5",
+    "babel-loader": "^10.1.1",
+    "webpack": "^5.105.4",
+    "webpack-cli": "^7.0.2"
+  }
 }

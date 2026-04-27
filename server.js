@@ -155,12 +155,16 @@ app.post('/plugins/facevault/session', async (req, res) => {
 
 		const sessionData = result.data;
 		const sessionToken = sessionData.session_token;
-		const appUrl = (publicMeta.app_url && publicMeta.app_url.value) || 'https://app.facevault.id';
-		const verificationUrl = appUrl + '?token=' + sessionToken;
+		const sessionId = sessionData.session_id;
+		const appUrl = ((publicMeta.app_url && publicMeta.app_url.value) || 'https://app.facevault.id').replace(/\/+$/, '');
+		// The webapp expects ?st=<session_token>&sid=<session_id> for API-key-mode
+		// sessions. ?token= is reserved for shared verification-link tokens, which
+		// route through /api/v1/links/<token>/init and would 404 here.
+		const verificationUrl = appUrl + '/?st=' + encodeURIComponent(sessionToken) + '&sid=' + encodeURIComponent(sessionId);
 
 		res.json({
 			url: verificationUrl,
-			session_id: sessionData.session_id,
+			session_id: sessionId,
 		});
 	} catch (err) {
 		loggerPlugin.error('FaceVault session error:', err.message);
