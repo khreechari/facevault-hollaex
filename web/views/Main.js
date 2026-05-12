@@ -73,20 +73,28 @@ function findOwnMeta(props) {
 // {type, value: "acme", ...}`) — we accept both. enabledPlugins arrives
 // from store.app.enabledPlugins via SmartTarget's mapStateToProps.
 function readMarketplaceField(props, fieldName) {
+	// HollaEx kits store full plugin configs (with public_meta) in `props.plugins`
+	// — an array of plugin objects keyed by `name`. `props.enabledPlugins` is
+	// just an array of activated plugin name strings in this kit version.
+	// We check both for forward/backward compat.
 	try {
-		var ep = props && props.enabledPlugins;
-		if (!Array.isArray(ep)) return null;
-		for (var i = 0; i < ep.length; i++) {
-			var p = ep[i];
-			if (!p || p.name !== 'facevault-kyc') continue;
-			var sources = [p.public_meta, p.meta];
-			for (var s = 0; s < sources.length; s++) {
-				var src = sources[s];
-				if (!src) continue;
-				var raw = src[fieldName];
-				if (raw == null) continue;
-				if (typeof raw === 'string' && raw) return raw;
-				if (typeof raw === 'object' && typeof raw.value === 'string' && raw.value) return raw.value;
+		var lists = [];
+		if (props && Array.isArray(props.plugins)) lists.push(props.plugins);
+		if (props && Array.isArray(props.enabledPlugins)) lists.push(props.enabledPlugins);
+		for (var l = 0; l < lists.length; l++) {
+			var arr = lists[l];
+			for (var i = 0; i < arr.length; i++) {
+				var p = arr[i];
+				if (!p || typeof p !== 'object' || p.name !== 'facevault-kyc') continue;
+				var sources = [p.public_meta, p.meta];
+				for (var s = 0; s < sources.length; s++) {
+					var src = sources[s];
+					if (!src) continue;
+					var raw = src[fieldName];
+					if (raw == null) continue;
+					if (typeof raw === 'string' && raw) return raw;
+					if (typeof raw === 'object' && typeof raw.value === 'string' && raw.value) return raw.value;
+				}
 			}
 		}
 	} catch (_) {}

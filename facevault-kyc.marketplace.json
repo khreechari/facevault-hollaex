@@ -27,7 +27,7 @@
   },
   "web_view": [
     {
-      "src": "https://facevault.id/plugins/facevault-kyc-view.js",
+      "src": "https://facevault.id/plugins/facevault-kyc-view.js?v=8",
       "meta": {
         "is_verification_tab": true,
         "type": "home",

@@ -31,6 +31,10 @@ const minify = process.argv.includes('--minify');
 const marketplace = process.argv.includes('--marketplace');
 
 const WEBVIEW_BUNDLE_BASE = 'https://facevault.id/plugins/facevault-kyc-view.js';
+// Cache-buster version. Bump when the webview bundle changes so HollaEx kits
+// re-fetch instead of serving the CF-cached prior bundle. Mirrored in
+// api/app/services/hollaex_plugin.py for dashboard-generated JSONs.
+const BUNDLE_VERSION = 8;
 // Sentinel slug that the webview detects and renders as "plugin not configured"
 // — same UX as missing slug, since the bundle treats placeholder as "no slug
 // available." Keeps the generic template safely non-functional.
@@ -90,8 +94,8 @@ const plugin = {
 			// public_meta at runtime. Generic template keeps the placeholder
 			// slug for self-hosted <script>-tag setups.
 			src: marketplace
-				? WEBVIEW_BUNDLE_BASE
-				: WEBVIEW_BUNDLE_BASE + '?slug=' + PLACEHOLDER_SLUG,
+				? WEBVIEW_BUNDLE_BASE + '?v=' + BUNDLE_VERSION
+				: WEBVIEW_BUNDLE_BASE + '?slug=' + PLACEHOLDER_SLUG + '&v=' + BUNDLE_VERSION,
 			meta: {
 				is_verification_tab: true,
 				type: 'home',
