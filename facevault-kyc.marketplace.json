@@ -4,7 +4,7 @@
   "type": "kyc",
   "author": "FaceVault",
   "bio": "AI-powered identity verification.",
-  "description": "Identity verification powered by FaceVault. Face matching, document OCR, liveness detection, and anti-spoofing — runs on FaceVault's branded hosted page; works on HollaEx Cloud and self-hosted kits. After install, set your slug in Configure.",
+  "description": "Identity verification powered by FaceVault. Face matching, document OCR, liveness detection, and anti-spoofing \u2014 runs on FaceVault's branded hosted page; works on HollaEx Cloud and self-hosted kits. After install, set your slug in Configure.",
   "documentation": "https://facevault.id/docs",
   "logo": "https://facevault.id/logo-shield.png",
   "icon": "https://facevault.id/favicon.svg",
@@ -15,18 +15,6 @@
       "type": "string",
       "required": true,
       "description": "Your FaceVault hosted-page slug (e.g. \"acme\"). Sign up at devdash.facevault.id, create a hosted-verification site, and paste the slug here.",
-      "value": ""
-    },
-    "hosted_base": {
-      "type": "string",
-      "required": false,
-      "description": "Override hosted page origin. Leave blank for facevault.id (default).",
-      "value": ""
-    },
-    "api_base": {
-      "type": "string",
-      "required": false,
-      "description": "Override API origin. Leave blank for api.facevault.id (default).",
       "value": ""
     }
   },

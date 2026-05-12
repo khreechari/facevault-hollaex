@@ -48,6 +48,10 @@ const SHIELD_SVG_B64 = Buffer.from(
 // Plugins → Configure UI renders inputs from this; the operator-typed value
 // lands at `enabledPlugins[].public_meta.slug.value` (or `.slug` flat,
 // depending on kit version). The bundle accepts either shape.
+//
+// Slug only — keeps the Configure UI to one field for non-technical operators.
+// Self-hosted FaceVault deployments (rare) edit web_view[0].meta directly in
+// the JSON for hosted_base/api_base overrides.
 const MARKETPLACE_PUBLIC_META = {
 	slug: {
 		type: 'string',
@@ -55,18 +59,6 @@ const MARKETPLACE_PUBLIC_META = {
 		description:
 			'Your FaceVault hosted-page slug (e.g. "acme"). Sign up at devdash.facevault.id, ' +
 			'create a hosted-verification site, and paste the slug here.',
-		value: '',
-	},
-	hosted_base: {
-		type: 'string',
-		required: false,
-		description: 'Override hosted page origin. Leave blank for facevault.id (default).',
-		value: '',
-	},
-	api_base: {
-		type: 'string',
-		required: false,
-		description: 'Override API origin. Leave blank for api.facevault.id (default).',
 		value: '',
 	},
 };
