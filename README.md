@@ -19,7 +19,7 @@ AI-powered identity verification for HollaEx-powered exchanges. Replace manual K
 
 This plugin is a **branded launcher**. Verification runs end-to-end on FaceVault's hosted page (`/v/<your-slug>`); the embedded webview is purely a verify button + status display. There are no plugin server scripts, so it works on **HollaEx Cloud** (which blocks `/plugins/*` server routes) and on self-hosted kits.
 
-The webview reads its operator-specific slug from its own `<script src="…?slug=…">` query string and polls `https://facevault.id/api/v1/external_users/status` for verification results — no operator-side server code required.
+The webview reads its operator-specific slug from the props HollaEx passes in — either `web_view[0].meta` (when the JSON is dashboard-generated with a baked slug) or `public_meta.slug` (when it's the generic marketplace JSON and the operator typed their slug into HollaEx's Configure UI). The bundle accepts both shapes from a single source. Verification results are polled from `https://facevault.id/api/v1/external_users/status` — no operator-side server code required.
 
 ## What works on HollaEx Cloud
 
@@ -49,7 +49,13 @@ Two ways to install. Pick whichever matches how you obtained the plugin.
 
 ### Option B: HollaEx Marketplace install
 
-If you installed FaceVault from HollaEx's App Store, the JSON is generic — it ships with a configurable `slug` field. After install:
+If you installed FaceVault from HollaEx's App Store — or want the generic JSON without signing up first — the plugin ships with a configurable `slug` field in `public_meta`.
+
+Direct download (latest):
+
+- [`facevault-kyc.marketplace.json`](https://github.com/khreechari/facevault-hollaex/releases/download/v2.0.0/facevault-kyc.marketplace.json) — also live at [`facevault.id/facevault-kyc.marketplace.json`](https://facevault.id/facevault-kyc.marketplace.json)
+
+After installing it in HollaEx:
 
 1. **Sign up** at [devdash.facevault.id](https://devdash.facevault.id) and create a hosted-verification site (just for the slug — you don't have to download a JSON).
 2. In your HollaEx Operator Control Panel, open the FaceVault plugin's **Configure** dialog and paste your slug into the `slug` field. (Optional: override `hosted_base` / `api_base` if you're on a self-hosted FaceVault.)
@@ -141,7 +147,7 @@ node build.js --marketplace # facevault-kyc.marketplace.json (HollaEx App Store 
 npx webpack                 # rebuild webview bundle (writes dist/facevault-kyc-view.js)
 ```
 
-Operators should always download their per-operator JSON from the FaceVault dashboard, not use the generic template at the repo root. The marketplace template is only used to submit to the HollaEx App Store.
+The dashboard-baked JSON (Option A) is the preferred path for most operators — zero HollaEx-side config and origins are pre-locked to your exchange. The generic `facevault-kyc.marketplace.json` (Option B) is the App Store install — same plugin, but you type your slug in HollaEx → Plugins → Configure after install.
 
 ## Support
 
