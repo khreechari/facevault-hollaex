@@ -2,145 +2,152 @@
 
 AI-powered identity verification for HollaEx-powered exchanges. Replace manual KYC review or cloud providers (Sumsub, iDenfy, Onfido) with FaceVault — flat pricing, no annual contracts, self-hosted option for enterprise.
 
-- [Blog post](https://facevault.id/blog/hollaex-kyc-plugin)
 - [Integration guide](https://facevault.id/integrations)
+- [Blog post](https://facevault.id/blog/hollaex-kyc-plugin)
 
 ## Features
 
-- AI face matching (ArcFace cosine similarity, 99.7% accuracy)
+- AI face matching (ArcFace cosine similarity)
 - Document OCR & MRZ extraction (passports, IDs, driver's licences)
-- 15-signal document fraud detection with tilt challenge
-- Liveness detection & 11-signal anti-spoofing fusion
+- 15-signal document fraud detection
+- Liveness detection & multi-signal anti-spoofing fusion
 - Optional proof of address verification
 - Encrypted at rest (AES-256-GCM)
 - GDPR-compliant with configurable data retention
-- Webhook replay protection (signed_at timestamp)
 
-## Quick Start
+## Architecture (v2 — Cloud-compatible)
 
-### 1. Get a FaceVault API key
+This plugin is a **branded launcher**. Verification runs end-to-end on FaceVault's hosted page (`/v/<your-slug>`); the embedded webview is purely a verify button + status display. There are no plugin server scripts, so it works on **HollaEx Cloud** (which blocks `/plugins/*` server routes) and on self-hosted kits.
 
-Sign up at [devdash.facevault.id](https://devdash.facevault.id). Free tier includes 50 verifications/month.
+The webview reads its operator-specific slug from its own `<script src="…?slug=…">` query string and polls `https://facevault.id/api/v1/external_users/status` for verification results — no operator-side server code required.
 
-### 2. Install the plugin
+## What works on HollaEx Cloud
 
-**Option A — Upload JSON:**
+- Full end-to-end verification (face match, document OCR, liveness, anti-spoofing)
+- Branded hosted page with the operator's logo, accent color, and copy
+- Status badge in the user's KYC tab updates live as the verification completes (passed / under review / failed)
+- Operator sees every completed session in the FaceVault dashboard
+- Webhook delivery (Starter+ tier) to the operator's own endpoint with full result payload
 
-Download [`facevault-kyc.json`](https://raw.githubusercontent.com/khreechari/facevault-hollaex/main/facevault-kyc.json) or build it yourself:
+## What requires self-hosted HollaEx
+
+- **Auto-flipping the user's HollaEx verification level** (e.g. promoting from level 1 → 2 on accept). HollaEx Cloud doesn't run custom plugin server scripts, so this can't run inside the plugin on Cloud. Options:
+  1. **Self-hosted operators**: install the legacy v1.4.3 plugin from [releases](https://github.com/khreechari/facevault-hollaex/releases/tag/v1.4.3) — its `server.js` calls `toolsLib.user.changeUserVerificationLevelById` on webhook arrival.
+  2. **Cloud operators**: run a small webhook receiver that takes FaceVault's webhook and calls HollaEx's admin API. Sample below.
+
+## Install
+
+Two ways to install. Pick whichever matches how you obtained the plugin.
+
+### Option A: Dashboard download (recommended)
+
+1. **Sign up** at [devdash.facevault.id](https://devdash.facevault.id) (free tier: 50 verifications/month).
+2. **Create a hosted page**: Dashboard → Hosted Verification → Add Site. Set a slug (e.g. `wisecryptootc`) and brand the page.
+3. **Generate the plugin**: on the same site card, click the ⋮ menu → "HollaEx plugin…" → Download.
+4. **Install in HollaEx**: Operator Control Panel → Plugins → Add Third Party Plugin → paste the downloaded JSON.
+5. **Activate** the plugin and reload your exchange. Users see "Verify Identity" in their KYC tab. No further configuration needed — the slug + origins are baked into the JSON.
+
+### Option B: HollaEx Marketplace install
+
+If you installed FaceVault from HollaEx's App Store, the JSON is generic — it ships with a configurable `slug` field. After install:
+
+1. **Sign up** at [devdash.facevault.id](https://devdash.facevault.id) and create a hosted-verification site (just for the slug — you don't have to download a JSON).
+2. In your HollaEx Operator Control Panel, open the FaceVault plugin's **Configure** dialog and paste your slug into the `slug` field. (Optional: override `hosted_base` / `api_base` if you're on a self-hosted FaceVault.)
+3. Save and activate. The plugin reads the slug from `public_meta` at runtime.
+
+## Capacity
+
+- **30 verification starts per (operator, IP) per hour** — corporate NATs verifying compliance teams in batch are fine.
+- **Daily verification cap** is configurable per site in the FaceVault dashboard.
+- **Monthly tier limits** apply (free 50 / starter 500 / pro 5,000).
+- Cloudflare Turnstile is enabled by default on hosted pages — bot traffic is filtered before it reaches the verification flow.
+
+## Optional: auto-flip user level on HollaEx Cloud
+
+Run this Cloudflare Worker (or any equivalent serverless function). It receives FaceVault's webhook, verifies the HMAC, and calls HollaEx's admin API to flip the user's verification level.
+
+```js
+// Cloudflare Worker — facevault-to-hollaex glue
+//
+// Env vars:
+//   FV_WEBHOOK_SECRET    — from your FaceVault site (revealed once on creation)
+//   HOLLAEX_API_URL      — e.g. https://yourexchange.hollaex.com/v2
+//   HOLLAEX_ADMIN_TOKEN  — HollaEx admin bearer token (HMAC-signed JWT)
+//   VERIFIED_LEVEL       — target HollaEx verification level (default 2)
+
+export default {
+  async fetch(request, env) {
+    if (request.method !== 'POST') return new Response('method not allowed', { status: 405 });
+
+    const sig = request.headers.get('x-signature') || '';
+    const raw = await request.text();
+    if (!(await verifyHmac(env.FV_WEBHOOK_SECRET, raw, sig))) {
+      return new Response('bad signature', { status: 401 });
+    }
+
+    const event = JSON.parse(raw);
+    if (event.event !== 'verification.completed') return new Response('ignored', { status: 200 });
+
+    // external_user_id = "hollaex_<numeric_id>" — set by the FaceVault plugin webview
+    const m = (event.external_user_id || '').match(/^hollaex_(\d+)$/);
+    if (!m) return new Response('not a hollaex session', { status: 200 });
+    const userId = parseInt(m[1], 10);
+
+    const accepted = event.status === 'passed' && event.trust_decision === 'accept';
+    if (!accepted) return new Response('not accepted', { status: 200 });
+
+    // HollaEx admin API: PUT /v2/admin/user/verification-level
+    const target = parseInt(env.VERIFIED_LEVEL || '2', 10);
+    const res = await fetch(`${env.HOLLAEX_API_URL}/admin/user/verification-level`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${env.HOLLAEX_ADMIN_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ user_id: userId, verification_level: target }),
+    });
+    return new Response(await res.text(), { status: res.status });
+  },
+};
+
+async function verifyHmac(secret, body, hexSig) {
+  // FaceVault signs compact JSON with recursively sorted keys (sha256-hex).
+  const sorted = JSON.stringify(sortKeys(JSON.parse(body)));
+  const key = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  );
+  const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(sorted));
+  const expected = [...new Uint8Array(mac)].map(b => b.toString(16).padStart(2, '0')).join('');
+  return expected === hexSig;
+}
+
+function sortKeys(o) {
+  if (o === null || typeof o !== 'object') return o;
+  if (Array.isArray(o)) return o.map(sortKeys);
+  return Object.keys(o).sort().reduce((acc, k) => { acc[k] = sortKeys(o[k]); return acc; }, {});
+}
+```
+
+Point your FaceVault site's webhook URL at this Worker. Verifications completed on Cloud will auto-flip the HollaEx user level.
+
+## Building from source
 
 ```bash
 git clone https://github.com/khreechari/facevault-hollaex.git
 cd facevault-hollaex
-node build.js
-# Upload facevault-kyc.json via HollaEx Operator Control Panel → Plugins → Add Third Party Plugin
+npm install
+node build.js               # facevault-kyc.json (generic template)
+node build.js --marketplace # facevault-kyc.marketplace.json (HollaEx App Store shape)
+npx webpack                 # rebuild webview bundle (writes dist/facevault-kyc-view.js)
 ```
 
-**Option B — HollaEx CLI:**
+Operators should always download their per-operator JSON from the FaceVault dashboard, not use the generic template at the repo root. The marketplace template is only used to submit to the HollaEx App Store.
 
-```bash
-hollaex plugin --install --file facevault-kyc.json
-```
+## Support
 
-### 3. Configure
-
-In the HollaEx Operator Control Panel → Plugins → FaceVault KYC:
-
-| Setting | Description |
-|---------|-------------|
-| `api_key` | Your FaceVault API key (`fv_live_...`) |
-| `api_url` | FaceVault API URL (default: `https://api.facevault.id`) |
-| `webhook_secret` | Webhook signing secret from [devdash.facevault.id](https://devdash.facevault.id) |
-| `verified_level` | HollaEx user level to assign on successful KYC (default: `2`) |
-| `require_poa` | Require proof of address document (default: `false`) |
-
-### 4. Set up webhook
-
-In your FaceVault dashboard ([devdash.facevault.id](https://devdash.facevault.id)), set the webhook URL to:
-
-```
-https://your-exchange.com/plugins/facevault/webhook
-```
-
-## How It Works
-
-```
-User clicks "Verify" on exchange
-        ↓
-Plugin creates FaceVault session (POST /api/v1/sessions)
-        ↓
-User opens FaceVault KYC webapp in new tab
-        ↓
-User scans ID → tilt challenge → liveness check → selfie → (optional PoA)
-        ↓
-FaceVault processes: face match, OCR, fraud detection, anti-spoofing
-        ↓
-Webhook fires to /plugins/facevault/webhook (HMAC-signed)
-        ↓
-Plugin updates HollaEx user verification level
-```
-
-## Verification Steps
-
-1. **ID Document** — Auto-scan with edge detection, perspective correction, OCR/MRZ extraction
-2. **Tilt Challenge** — Tilt the card to prove it's physical (detects screen replay)
-3. **Liveness Check** — Turn head left → center (anti-spoofing)
-4. **Selfie** — Face comparison against ID photo (ArcFace neural network)
-5. **Proof of Address** (optional) — Utility bill / bank statement with name cross-check
-
-## Trust Scoring
-
-FaceVault returns a 0-100 trust score with a decision:
-
-| Score | Decision | Plugin Action |
-|-------|----------|--------------|
-| ≥ 70 | Accept | Upgrades user to `verified_level` |
-| 40-69 | Review | Marks as pending (status 1) |
-| < 40 | Reject | Marks as rejected (status 2) |
-
-## Pricing
-
-| Plan | Price | Included | Overage |
-|------|-------|----------|---------|
-| Free | $0 | 50/mo | — |
-| Starter | $49/mo | 500/mo | $0.99 |
-| Pro | $199/mo | 5,000/mo | $0.35 |
-| Enterprise | Custom | Unlimited | — |
-
-## Development
-
-```bash
-# Build the plugin JSON
-node build.js
-
-# Build minified
-node build.js --minify
-```
-
-### Plugin structure
-
-```
-facevault-hollaex/
-├── config.json         # Plugin metadata & configuration schema
-├── server.js           # Express routes (session, webhook, status)
-├── web/views/Main.js   # React component for the verification page
-├── build.js            # Generates uploadable plugin JSON
-├── facevault-kyc.json   # Pre-built plugin (ready to upload)
-├── package.json
-└── README.md
-```
-
-## Self-Hosted FaceVault
-
-For enterprise operators who need biometric data on their own infrastructure, FaceVault can be self-hosted. Contact [support@facevault.id](mailto:support@facevault.id) for details.
-
-Set `api_url` in plugin config to your self-hosted URL (e.g. `https://kyc.your-exchange.com`).
-
-## Verify Download
-
-```bash
-sha256sum facevault-kyc.json
-# b109c50a7942c6798f5e587063e4f28d64566b2c7eaf8398a04d4fe8c00fac0a
-```
+- Email: [support@facevault.id](mailto:support@facevault.id)
+- Docs: [facevault.id/docs](https://facevault.id/docs)
+- Issues: [github.com/khreechari/facevault-hollaex/issues](https://github.com/khreechari/facevault-hollaex/issues)
 
 ## License
 
