@@ -53,12 +53,12 @@ If you installed FaceVault from HollaEx's App Store — or want the generic JSON
 
 Direct download (latest):
 
-- [`facevault-kyc.marketplace.json`](https://github.com/khreechari/facevault-hollaex/releases/download/v2.0.0/facevault-kyc.marketplace.json) — also live at [`facevault.id/facevault-kyc.marketplace.json`](https://facevault.id/facevault-kyc.marketplace.json)
+- [`facevault-kyc.marketplace.json`](https://github.com/khreechari/facevault-hollaex/releases/download/v2.0.1/facevault-kyc.marketplace.json) — also live at [`facevault.id/facevault-kyc.marketplace.json`](https://facevault.id/facevault-kyc.marketplace.json)
 
 After installing it in HollaEx:
 
 1. **Sign up** at [devdash.facevault.id](https://devdash.facevault.id) and create a hosted-verification site (just for the slug — you don't have to download a JSON).
-2. In your HollaEx Operator Control Panel, open the FaceVault plugin's **Configure** dialog and paste your slug into the `slug` field. (Optional: override `hosted_base` / `api_base` if you're on a self-hosted FaceVault.)
+2. In your HollaEx Operator Control Panel, open the FaceVault plugin's **Configure** dialog and paste your slug into the `slug` field. (Self-hosted FaceVault deployments: override `hosted_base` / `api_base` by editing `web_view[0].meta` in the JSON directly before installing.)
 3. Save and activate. The plugin reads the slug from `public_meta` at runtime.
 
 ## Capacity
