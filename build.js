@@ -67,10 +67,18 @@ const MARKETPLACE_PUBLIC_META = {
 	},
 };
 
+// Top-level `type` is the plugin category. HollaEx kit maps it into
+// `enabledPlugins` and uses it to decide which built-in verification tabs to
+// show (web/src/containers/Verification/index.js — values 'kyc', 'bank',
+// 'sms', 'user_payments' trigger the stock built-in tabs). We deliberately
+// use 'external_kyc' so the stock identity tab — which renders as "page
+// under construction" alongside our plugin tab — does NOT appear. Admin
+// auto-detect of "the kyc plugin" falls back to name 'kyc' but its server
+// routes are 405 on Cloud anyway and we ship no server.js.
 const plugin = {
 	name: 'facevault-kyc',
 	version: 1,
-	type: 'kyc',
+	type: 'external_kyc',
 	author: 'FaceVault',
 	bio: 'AI-powered identity verification.',
 	description: marketplace
@@ -99,13 +107,19 @@ const plugin = {
 			meta: {
 				is_verification_tab: true,
 				type: 'home',
-				string: {
-					id: 'FACEVAULT_KYC_VERIFICATION',
-					value: 'Identity Verification',
+				// `string.id` and `icon.id` are LOOKUP KEYS the kit globalizes
+				// (utils/id.js → generateGlobalId) and dereferences against
+				// the in-app STRINGS / ICONS registries. The actual text and
+				// icon data must be supplied via `strings` and `icons` below
+				// — `string.value` / `icon.value` are NOT read by the kit.
+				string: { id: 'FACEVAULT_KYC_VERIFICATION' },
+				icon: { id: 'FACEVAULT_SHIELD_ICON' },
+				strings: {
+					en: { FACEVAULT_KYC_VERIFICATION: 'Identity Verification' },
 				},
-				icon: {
-					id: 'FACEVAULT_SHIELD_ICON',
-					value: 'data:image/svg+xml;base64,' + SHIELD_SVG_B64,
+				icons: {
+					dark: { FACEVAULT_SHIELD_ICON: 'data:image/svg+xml;base64,' + SHIELD_SVG_B64 },
+					white: { FACEVAULT_SHIELD_ICON: 'data:image/svg+xml;base64,' + SHIELD_SVG_B64 },
 				},
 			},
 		},

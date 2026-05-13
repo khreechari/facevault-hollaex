@@ -1,7 +1,7 @@
 {
   "name": "facevault-kyc",
   "version": 1,
-  "type": "kyc",
+  "type": "external_kyc",
   "author": "FaceVault",
   "bio": "AI-powered identity verification.",
   "description": "Identity verification powered by FaceVault. Face matching, document OCR, liveness detection, and anti-spoofing — no manual review queue. NOTE: install the per-operator JSON from your FaceVault dashboard, not this generic template.",
@@ -20,17 +20,28 @@
   },
   "web_view": [
     {
-      "src": "https://facevault.id/plugins/facevault-kyc-view.js?slug=configure-via-dashboard",
+      "src": "https://facevault.id/plugins/facevault-kyc-view.js?slug=configure-via-dashboard&v=8",
       "meta": {
         "is_verification_tab": true,
         "type": "home",
         "string": {
-          "id": "FACEVAULT_KYC_VERIFICATION",
-          "value": "Identity Verification"
+          "id": "FACEVAULT_KYC_VERIFICATION"
         },
         "icon": {
-          "id": "FACEVAULT_SHIELD_ICON",
-          "value": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNGFkZTgwIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMTIgMjJzOC00IDgtMTBWNWwtOC0zLTggM3Y3YzAgNiA4IDEwIDggMTB6Ii8+PHBhdGggZD0iTTkgMTJsMiAyIDQtNCIvPjwvc3ZnPg=="
+          "id": "FACEVAULT_SHIELD_ICON"
+        },
+        "strings": {
+          "en": {
+            "FACEVAULT_KYC_VERIFICATION": "Identity Verification"
+          }
+        },
+        "icons": {
+          "dark": {
+            "FACEVAULT_SHIELD_ICON": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNGFkZTgwIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMTIgMjJzOC00IDgtMTBWNWwtOC0zLTggM3Y3YzAgNiA4IDEwIDggMTB6Ii8+PHBhdGggZD0iTTkgMTJsMiAyIDQtNCIvPjwvc3ZnPg=="
+          },
+          "white": {
+            "FACEVAULT_SHIELD_ICON": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNGFkZTgwIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMTIgMjJzOC00IDgtMTBWNWwtOC0zLTggM3Y3YzAgNiA4IDEwIDggMTB6Ii8+PHBhdGggZD0iTTkgMTJsMiAyIDQtNCIvPjwvc3ZnPg=="
+          }
         }
       }
     }
