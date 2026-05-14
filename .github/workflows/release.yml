@@ -12,19 +12,22 @@ jobs:
   build-and-release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # All third-party actions are SHA-pinned per supply-chain best practice:
+      # tag references can be repointed (or hijacked via npm-style typosquats),
+      # commit SHAs cannot. Comments record the human-readable version next to
+      # each SHA so dependabot/renovate-style bumps stay reviewable.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
           node-version: '20'
 
       - run: npm ci --no-audit --no-fund
 
-      - name: Build plugin JSONs (all variants)
+      - name: Build plugin JSONs
         run: |
           node build.js
           node build.js --marketplace
-          node build.js --marketplace --staging
 
       - name: Build webview bundle
         run: npx webpack
@@ -34,18 +37,17 @@ jobs:
           sha256sum \
             facevault-kyc.json \
             facevault-kyc.marketplace.json \
-            facevault-kyc.marketplace-staging.json \
             dist/facevault-kyc-view.js \
             > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Publish release assets
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2.6.2
         with:
           files: |
             facevault-kyc.json
             facevault-kyc.marketplace.json
-            facevault-kyc.marketplace-staging.json
             dist/facevault-kyc-view.js
             SHA256SUMS.txt
           fail_on_unmatched_files: true
+          generate_release_notes: true

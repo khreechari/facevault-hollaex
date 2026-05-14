@@ -56,6 +56,32 @@ After installing it in HollaEx:
 2. In your HollaEx Operator Control Panel, open the FaceVault plugin's **Configure** dialog and paste your slug into the `slug` field. (Self-hosted FaceVault deployments: override `hosted_base` / `api_base` by editing `web_view[0].meta` in the JSON directly before installing.)
 3. Save and activate. The plugin reads the slug from `public_meta` at runtime.
 
+## Staying up to date (v2.0.4+)
+
+The webview self-checks for plugin updates. On every render it fetches
+[`api.facevault.id/api/v1/integrations/hollaex/manifest`](https://api.facevault.id/api/v1/integrations/hollaex/manifest)
+and compares the released `latest_version` against the `installed_version`
+baked into your JSON's `web_view[0].meta`. When the installed JSON is behind:
+
+- **Admin users** (HollaEx `user.is_admin === true`) see an upgrade banner
+  above the verify button: *"Plugin update available — vX.Y.Z"*.
+- **Regular exchange users** see nothing change.
+
+Clicking **Update now** fetches the latest marketplace JSON from the GitHub
+release, copies it to the operator's clipboard, and opens the HollaEx
+operator panel in a new tab. The operator pastes the JSON into
+Plugins → Add Third Party Plugin (or Edit) and saves.
+
+Clicking **What's new** opens the changelog on this repo's release page.
+Per-session dismissal is supported (banner returns next visit until you
+actually update). New versions re-prompt automatically.
+
+If the manifest endpoint can't be reached — CSP/CORS on a self-hosted
+exchange, network blip, GitHub outage — the banner silently doesn't show
+and the plugin behaves normally. The manifest is cached server-side and
+falls back to stale data during GH outages, so transient errors don't
+break operator dashboards.
+
 ## Capacity
 
 - **30 verification starts per (operator, IP) per hour** — corporate NATs verifying compliance teams in batch are fine.

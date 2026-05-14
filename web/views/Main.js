@@ -124,15 +124,14 @@ function resolveConfig(props) {
 		|| readMarketplaceField(props, 'hosted_base')
 		|| _SCRIPT_INFO.origin
 		|| 'https://facevault.id';
-	// API origin: explicit from meta, else map known prod/staging hosts off
-	// the bundle origin, else assume same-origin (self-hosted).
-	var apiBase = meta.api_base || readMarketplaceField(props, 'api_base');
-	if (!apiBase) {
-		var o = _SCRIPT_INFO.origin;
-		if (o === 'https://facevault.id') apiBase = 'https://api.facevault.id';
-		else if (o === 'https://staging.facevault.id') apiBase = 'https://api-staging.facevault.id';
-		else apiBase = o || 'https://api.facevault.id';
-	}
+	// API origin: explicit from meta (dashboard-generated JSONs always set
+	// this); fall back to the bundle's own origin for self-hosted setups;
+	// last resort the public prod API.
+	var apiBase = meta.api_base
+		|| readMarketplaceField(props, 'api_base')
+		|| _SCRIPT_INFO.origin
+		|| 'https://api.facevault.id';
+	if (apiBase === 'https://facevault.id') apiBase = 'https://api.facevault.id';
 	return { slug: slug, hostedBase: hostedBase, apiBase: apiBase };
 }
 
