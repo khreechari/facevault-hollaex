@@ -5,6 +5,48 @@ All notable changes to the FaceVault HollaEx plugin.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.0.6] — 2026-05-14
+
+### Added
+- `operator_path` field in `web_view[0].meta`. Operators on a HollaEx
+  kit that routes admin somewhere other than `/operator/` can override
+  the destination of the upgrade-now "open operator panel" action by
+  setting this in their JSON before installing. Sanitised to reject
+  any value that isn't a same-origin absolute path, so a hostile
+  meta value can't redirect the admin off-site.
+- `SECURITY.md` — disclosure channel + response timeline.
+- `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md` — standard FOSS docs.
+- `coverageThreshold` gate on the test suite (90% lines, 100% functions,
+  80% branches on `utils.js`). CI runs `npm run test:coverage` so a
+  regression in helper coverage blocks publish.
+- Workflow now sources the GitHub release body from the matching
+  `CHANGELOG.md` section (`body_path`), so future releases auto-populate
+  with the content you wrote in the changelog instead of just the
+  Full-Changelog compare link.
+- 9 additional unit tests covering the new `sanitizeOperatorPath` and
+  `readOperatorPath` helpers (43 tests total).
+
+### Changed
+- Polling loop now pauses when the tab is in the background
+  (`document.hidden`) and resumes when it comes back. Halves the request
+  budget for users who park us in another tab.
+- Exponential backoff on consecutive poll errors (doubles each failure,
+  capped at 30s). A transient API outage no longer burns 600 fixed-rate
+  requests per session.
+- All async `setState` calls guarded by an `_isMounted` flag, eliminating
+  the React warning when a component unmounts during an in-flight fetch.
+
+### Removed
+- `dist/facevault-kyc-view.js` is no longer committed to git. The bundle
+  is built by CI and published as a release asset; committing it
+  invited drift between source and built artefact.
+
+### Fixed
+- LICENSE copyright updated to `Kaditham Holdings Pte Ltd` and uses the
+  `2026-present` form so future-year additions don't need a date bump.
+- `.gitignore` expanded to cover `dist/`, `coverage/`, OS cruft, and
+  editor scratch.
+
 ## [v2.0.5] — 2026-05-14
 
 ### Added
@@ -104,6 +146,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Webapp URL pattern (`?sid=&st=`) and a build.js regression that produced
   a malformed JSON for non-dashboard installs.
 
+[v2.0.6]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.6
 [v2.0.5]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.5
 [v2.0.4]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.4
 [v2.0.3]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.3

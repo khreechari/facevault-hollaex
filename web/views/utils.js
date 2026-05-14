@@ -137,3 +137,23 @@ export function isTrustedMarketplaceUrl(url) {
 		return false;
 	}
 }
+
+// HollaEx operator panel path. Defaults to `/operator/` which is the
+// stock kit route; operators on a custom admin path can override by
+// setting web_view[0].meta.operator_path before installing. We only
+// accept same-origin absolute paths (starts with `/`) — anything else
+// gets ignored so a hostile meta value can't redirect the admin off-site.
+export const DEFAULT_OPERATOR_PATH = '/operator/';
+
+export function sanitizeOperatorPath(raw) {
+	if (typeof raw !== 'string' || !raw) return DEFAULT_OPERATOR_PATH;
+	// Must be an absolute same-origin path. Reject schemes, protocol-
+	// relative URLs, and anything that could re-target the open() call.
+	if (raw[0] !== '/' || raw.indexOf('//') === 0) return DEFAULT_OPERATOR_PATH;
+	return raw;
+}
+
+export function readOperatorPath(props) {
+	const meta = findOwnMeta(props) || {};
+	return sanitizeOperatorPath(meta.operator_path);
+}

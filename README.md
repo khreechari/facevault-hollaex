@@ -72,6 +72,11 @@ release, copies it to the operator's clipboard, and opens the HollaEx
 operator panel in a new tab. The operator pastes the JSON into
 Plugins → Add Third Party Plugin (or Edit) and saves.
 
+By default the upgrade flow opens `<exchange>/operator/`. If your HollaEx
+kit serves admin from a different path, override it by adding
+`"operator_path": "/admin/"` to `web_view[0].meta` in your installed
+JSON. Only same-origin absolute paths are accepted.
+
 Clicking **What's new** opens the changelog on this repo's release page.
 Per-session dismissal is supported (banner returns next visit until you
 actually update). New versions re-prompt automatically.

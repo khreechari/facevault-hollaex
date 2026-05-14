@@ -1,1 +1,24 @@
+# Dependencies
 node_modules/
+
+# Build / coverage artefacts produced by `npm test` / `npm run build` locally.
+# The release bundle is built in CI and published as a GH release asset; we
+# don't commit dist/ to avoid drift between source and built artefacts.
+dist/
+coverage/
+
+# Local logs and OS cruft
+*.log
+.DS_Store
+Thumbs.db
+
+# Editor scratch
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local env overrides (none expected in this repo, but defense in depth)
+.env
+.env.*
+!.env.example

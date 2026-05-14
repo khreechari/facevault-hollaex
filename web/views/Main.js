@@ -47,6 +47,7 @@ import {
 	readBannerDismissed,
 	readInstalledVersion,
 	readMarketplaceField,
+	readOperatorPath,
 	writeBannerDismissed,
 } from './utils';
 
@@ -212,6 +213,9 @@ const POLL_INTERVAL_MS = 3000;
 // 30 min covers slow user flows (capture, retries, document-fraud wait) and
 // users who close + reopen the HollaEx tab while verification is in flight.
 const POLL_TIMEOUT_MS = 30 * 60 * 1000;
+// Exponential backoff on consecutive poll errors so a transient API outage
+// doesn't burn 600 requests/session. Doubles each failure up to the cap.
+const POLL_ERROR_BACKOFF_CAP_MS = 30 * 1000;
 
 // Plugin update detection. Manifest is fetched from FaceVault on mount and
 // compared to the installed_version baked into web_view[0].meta. Admin users
@@ -231,9 +235,19 @@ class FaceVaultKYC extends Component {
 		};
 		this._pollTimer = null;
 		this._pollDeadline = 0;
+		this._consecutiveErrors = 0;
+		this._isMounted = false;
+		this._onVisibilityChange = this._onVisibilityChange.bind(this);
+	}
+
+	// Setting state on an unmounted component logs a React warning and
+	// leaks the closure. Guard every async setState call against this.
+	_safeSetState(update) {
+		if (this._isMounted) this.setState(update);
 	}
 
 	componentDidMount() {
+		this._isMounted = true;
 		// Always start polling on mount: the session may have been launched in
 		// a previous page load (user closed + reopened this tab) or from a
 		// different device. Polling auto-stops on terminal state.
@@ -247,10 +261,33 @@ class FaceVaultKYC extends Component {
 		if (cfg.slug && isAdminUser(this.props)) {
 			this._fetchManifest();
 		}
+		if (typeof document !== 'undefined' && document.addEventListener) {
+			document.addEventListener('visibilitychange', this._onVisibilityChange);
+		}
 	}
 
 	componentWillUnmount() {
+		this._isMounted = false;
 		this._stopPolling();
+		if (typeof document !== 'undefined' && document.removeEventListener) {
+			document.removeEventListener('visibilitychange', this._onVisibilityChange);
+		}
+	}
+
+	_onVisibilityChange() {
+		// Pause the poll when the tab is backgrounded; resume when it's
+		// foregrounded and we haven't reached the session deadline yet.
+		// Backgrounded tabs throttle setInterval anyway but this halves
+		// the request budget for users who park us in another tab.
+		if (typeof document === 'undefined') return;
+		if (document.hidden) {
+			if (this._pollTimer) {
+				clearInterval(this._pollTimer);
+				this._pollTimer = null;
+			}
+		} else if (!this._pollTimer && this._pollDeadline > Date.now()) {
+			this._scheduleNextPoll(POLL_INTERVAL_MS);
+		}
 	}
 
 	_fetchManifest = async () => {
@@ -260,7 +297,7 @@ class FaceVaultKYC extends Component {
 			if (!res.ok) return;
 			const data = await res.json();
 			if (!data || !data.latest_version) return;
-			this.setState({
+			this._safeSetState({
 				manifest: data,
 				bannerDismissed: readBannerDismissed(data.latest_version),
 			});
@@ -275,7 +312,7 @@ class FaceVaultKYC extends Component {
 		if (manifest && manifest.latest_version) {
 			writeBannerDismissed(manifest.latest_version);
 		}
-		this.setState({ bannerDismissed: true, updateCopied: false });
+		this._safeSetState({ bannerDismissed: true, updateCopied: false });
 	};
 
 	// Fetch the latest plugin JSON, copy to clipboard, open operator panel.
@@ -297,26 +334,25 @@ class FaceVaultKYC extends Component {
 			window.open(manifest.changelog_url, '_blank', 'noopener,noreferrer');
 			return;
 		}
-		this.setState({ upgradeInFlight: true, updateCopied: false });
+		this._safeSetState({ upgradeInFlight: true, updateCopied: false });
 		try {
 			const res = await fetch(manifest.marketplace_json_url);
 			if (!res.ok) throw new Error('fetch failed');
 			const jsonText = await res.text();
 			if (navigator.clipboard && navigator.clipboard.writeText) {
 				await navigator.clipboard.writeText(jsonText);
-				this.setState({ updateCopied: true });
+				this._safeSetState({ updateCopied: true });
 			}
-			// HollaEx kits commonly serve the operator panel at /operator/
-			// on the same origin the user is currently on. Some kit variants
-			// route admin differently; on those, this opens a 404 in a new
-			// tab and the admin navigates manually from the home page.
-			window.open(window.location.origin + '/operator/', '_blank', 'noopener,noreferrer');
+			// Operator panel path. Defaults to /operator/; operators on a
+			// custom admin route override via web_view[0].meta.operator_path.
+			// sanitizeOperatorPath rejects anything that isn't a same-origin
+			// absolute path so a hostile meta value can't redirect us off-site.
+			const operatorPath = readOperatorPath(this.props);
+			window.open(window.location.origin + operatorPath, '_blank', 'noopener,noreferrer');
 		} catch (_) {
-			// On failure, at least open the changelog so they can grab the
-			// JSON manually from the GH release page.
 			window.open(manifest.changelog_url, '_blank', 'noopener,noreferrer');
 		} finally {
-			this.setState({ upgradeInFlight: false });
+			this._safeSetState({ upgradeInFlight: false });
 		}
 	};
 
@@ -335,31 +371,68 @@ class FaceVaultKYC extends Component {
 				+ '?slug=' + encodeURIComponent(cfg.slug)
 				+ '&external_user_id=' + encodeURIComponent(ext);
 			const res = await fetch(url, { method: 'GET' });
-			if (!res.ok) return;
+			if (!res.ok) {
+				this._consecutiveErrors += 1;
+				return;
+			}
 			const data = await res.json();
+			this._consecutiveErrors = 0;
 			if (data && data.status) {
-				this.setState({ fvStatus: data.status });
+				this._safeSetState({ fvStatus: data.status });
 				if (data.status === 'passed' || data.status === 'failed' || data.status === 'in_review') {
 					this._stopPolling();
 				}
 			}
 		} catch (_) {
-			// Network blip — keep polling, surface only persistent errors
+			// Network blip — keep polling, but back off on repeated errors.
+			this._consecutiveErrors += 1;
 		}
+	};
+
+	// Doubles the base interval per consecutive error, capped. After a
+	// successful poll _consecutiveErrors resets to 0, restoring normal cadence.
+	_nextPollDelay() {
+		if (this._consecutiveErrors === 0) return POLL_INTERVAL_MS;
+		const delay = POLL_INTERVAL_MS * Math.pow(2, this._consecutiveErrors);
+		return Math.min(delay, POLL_ERROR_BACKOFF_CAP_MS);
+	}
+
+	_scheduleNextPoll = (delay) => {
+		if (this._pollTimer) clearInterval(this._pollTimer);
+		this._pollTimer = setTimeout(async () => {
+			if (!this._isMounted) return;
+			if (Date.now() > this._pollDeadline) { this._stopPolling(); return; }
+			// Don't burn requests on a hidden tab; visibility handler will
+			// reschedule when it comes back to the foreground.
+			if (typeof document !== 'undefined' && document.hidden) {
+				this._pollTimer = null;
+				return;
+			}
+			await this._pollOnce();
+			if (this._isMounted && this._pollTimer !== null) {
+				this._scheduleNextPoll(this._nextPollDelay());
+			}
+		}, delay);
 	};
 
 	_startPolling = () => {
 		this._stopPolling();
 		this._pollDeadline = Date.now() + POLL_TIMEOUT_MS;
-		this._pollOnce();
-		this._pollTimer = setInterval(() => {
-			if (Date.now() > this._pollDeadline) { this._stopPolling(); return; }
-			this._pollOnce();
-		}, POLL_INTERVAL_MS);
+		this._consecutiveErrors = 0;
+		// Fire once immediately, then schedule subsequent polls.
+		this._pollOnce().then(() => {
+			if (!this._isMounted) return;
+			this._pollTimer = -1; // sentinel: poller is active, will be replaced by setTimeout id
+			this._scheduleNextPoll(this._nextPollDelay());
+		});
 	};
 
 	_stopPolling = () => {
-		if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; }
+		if (this._pollTimer) {
+			clearTimeout(this._pollTimer);
+			clearInterval(this._pollTimer);
+			this._pollTimer = null;
+		}
 	};
 
 	_buildVerifyUrl(cfg) {
@@ -371,7 +444,7 @@ class FaceVaultKYC extends Component {
 	_launchVerify = (cfg) => {
 		const url = this._buildVerifyUrl(cfg);
 		window.open(url, '_blank', 'noopener,noreferrer');
-		this.setState({ launched: true });
+		this._safeSetState({ launched: true });
 		this._startPolling();
 	};
 

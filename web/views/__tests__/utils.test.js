@@ -16,8 +16,11 @@ const {
 	readBannerDismissed,
 	readInstalledVersion,
 	readMarketplaceField,
+	readOperatorPath,
+	sanitizeOperatorPath,
 	writeBannerDismissed,
 	bannerDismissKey,
+	DEFAULT_OPERATOR_PATH,
 	TRUSTED_MARKETPLACE_ORIGINS,
 } = require('../utils');
 
@@ -215,6 +218,54 @@ describe('isTrustedMarketplaceUrl', () => {
 	});
 	test('allowlist is frozen', () => {
 		expect(Object.isFrozen(TRUSTED_MARKETPLACE_ORIGINS)).toBe(true);
+	});
+});
+
+describe('sanitizeOperatorPath', () => {
+	test('returns the default for missing input', () => {
+		expect(sanitizeOperatorPath(null)).toBe(DEFAULT_OPERATOR_PATH);
+		expect(sanitizeOperatorPath(undefined)).toBe(DEFAULT_OPERATOR_PATH);
+		expect(sanitizeOperatorPath('')).toBe(DEFAULT_OPERATOR_PATH);
+	});
+	test('accepts a same-origin absolute path', () => {
+		expect(sanitizeOperatorPath('/admin')).toBe('/admin');
+		expect(sanitizeOperatorPath('/admin/plugins')).toBe('/admin/plugins');
+	});
+	test('rejects protocol-relative URLs (would open foreign origin)', () => {
+		expect(sanitizeOperatorPath('//evil.example/admin')).toBe(DEFAULT_OPERATOR_PATH);
+	});
+	test('rejects absolute URLs with schemes', () => {
+		expect(sanitizeOperatorPath('https://evil.example/admin')).toBe(DEFAULT_OPERATOR_PATH);
+		expect(sanitizeOperatorPath('javascript:alert(1)')).toBe(DEFAULT_OPERATOR_PATH);
+		expect(sanitizeOperatorPath('http://evil/x')).toBe(DEFAULT_OPERATOR_PATH);
+	});
+	test('rejects relative paths', () => {
+		expect(sanitizeOperatorPath('operator')).toBe(DEFAULT_OPERATOR_PATH);
+		expect(sanitizeOperatorPath('./admin')).toBe(DEFAULT_OPERATOR_PATH);
+	});
+	test('rejects non-string input', () => {
+		expect(sanitizeOperatorPath(42)).toBe(DEFAULT_OPERATOR_PATH);
+		expect(sanitizeOperatorPath({})).toBe(DEFAULT_OPERATOR_PATH);
+	});
+});
+
+describe('readOperatorPath', () => {
+	test('reads from web_view[0].meta.operator_path', () => {
+		const props = {
+			id: 't',
+			webViews: { t: [{ name: 'facevault-kyc', meta: { operator_path: '/admin/plugins' } }] },
+		};
+		expect(readOperatorPath(props)).toBe('/admin/plugins');
+	});
+	test('defaults when meta is empty', () => {
+		expect(readOperatorPath({})).toBe(DEFAULT_OPERATOR_PATH);
+	});
+	test('defaults when meta value is hostile', () => {
+		const props = {
+			id: 't',
+			webViews: { t: [{ name: 'facevault-kyc', meta: { operator_path: 'https://evil/x' } }] },
+		};
+		expect(readOperatorPath(props)).toBe(DEFAULT_OPERATOR_PATH);
 	});
 });
 
