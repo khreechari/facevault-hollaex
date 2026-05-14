@@ -42,6 +42,14 @@ if (staging && !marketplace) {
 	process.exit(1);
 }
 
+// Read semver from package.json so the JSON output records exactly which
+// plugin version produced it. The webview reads this back from
+// web_view[0].meta.installed_version and compares against the manifest
+// served by api.facevault.id to decide whether to show the upgrade banner.
+const PKG_VERSION = JSON.parse(
+	fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')
+).version;
+
 const WEBVIEW_BUNDLE_BASE = staging
 	? 'https://staging.facevault.id/plugins/facevault-kyc-view.js'
 	: 'https://facevault.id/plugins/facevault-kyc-view.js';
@@ -125,6 +133,10 @@ const plugin = {
 				{
 					is_verification_tab: true,
 					type: 'home',
+					// Plugin semver, used by the webview to decide whether to
+					// prompt admins about a newer release. Compared against
+					// /api/v1/integrations/hollaex/manifest's latest_version.
+					installed_version: PKG_VERSION,
 					// `string.id` and `icon.id` are LOOKUP KEYS the kit globalizes
 					// (utils/id.js → generateGlobalId) and dereferences against
 					// the in-app STRINGS / ICONS registries. The actual text and

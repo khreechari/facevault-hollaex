@@ -200,12 +200,112 @@ const STYLES = {
 		borderRadius: '8px', padding: '12px 14px', marginTop: '16px',
 		textAlign: 'center', width: '100%', boxSizing: 'border-box',
 	},
+	updateBanner: {
+		width: '100%', boxSizing: 'border-box',
+		display: 'flex', alignItems: 'flex-start', gap: '12px',
+		padding: '12px 14px', marginBottom: '20px',
+		background: 'rgba(34,211,238,0.06)',
+		border: '1px solid rgba(34,211,238,0.18)',
+		borderRadius: '10px',
+	},
+	updateBannerIcon: {
+		flexShrink: 0, marginTop: '2px', color: '#22d3ee',
+	},
+	updateBannerBody: { flex: 1, minWidth: 0 },
+	updateBannerTitle: {
+		fontSize: '13px', fontWeight: '600', color: '#22d3ee', marginBottom: '2px',
+	},
+	updateBannerMeta: {
+		fontSize: '12px', opacity: 0.6, marginBottom: '8px',
+	},
+	updateBannerActions: {
+		display: 'flex', gap: '8px', flexWrap: 'wrap',
+	},
+	updateBannerCta: {
+		appearance: 'none', cursor: 'pointer',
+		padding: '6px 12px', borderRadius: '6px',
+		fontSize: '12px', fontWeight: '600',
+		background: 'rgba(34,211,238,0.15)',
+		color: '#22d3ee',
+		border: '1px solid rgba(34,211,238,0.25)',
+	},
+	updateBannerLink: {
+		display: 'inline-flex', alignItems: 'center',
+		padding: '6px 10px', borderRadius: '6px',
+		fontSize: '12px', fontWeight: '500',
+		color: 'rgba(255,255,255,0.6)',
+		textDecoration: 'none', background: 'transparent',
+	},
+	updateBannerDismiss: {
+		appearance: 'none', background: 'transparent', border: 'none',
+		color: 'rgba(255,255,255,0.4)', cursor: 'pointer',
+		fontSize: '18px', lineHeight: '1', padding: '0 4px',
+	},
+	updateBannerCopied: {
+		marginTop: '8px', fontSize: '11px', color: '#4ade80',
+	},
 };
 
 const POLL_INTERVAL_MS = 3000;
 // 30 min covers slow user flows (capture, retries, document-fraud wait) and
 // users who close + reopen the HollaEx tab while verification is in flight.
 const POLL_TIMEOUT_MS = 30 * 60 * 1000;
+
+// Plugin update detection. Manifest is fetched from FaceVault on mount and
+// compared to the installed_version baked into web_view[0].meta. Admin users
+// on stale versions see an upgrade banner above the verify button.
+const MANIFEST_PATH = '/api/v1/integrations/hollaex/manifest';
+
+// Lexicographic semver comparison sufficient for our `X.Y.Z` releases.
+// Returns positive if a > b, negative if a < b, 0 if equal. Defensive
+// against missing/non-numeric inputs (treats them as 0).
+function compareSemver(a, b) {
+	var parse = function (v) {
+		var parts = String(v || '0.0.0').split('.');
+		return [
+			parseInt(parts[0], 10) || 0,
+			parseInt(parts[1], 10) || 0,
+			parseInt(parts[2], 10) || 0,
+		];
+	};
+	var pa = parse(a);
+	var pb = parse(b);
+	for (var i = 0; i < 3; i++) {
+		if (pa[i] !== pb[i]) return pa[i] - pb[i];
+	}
+	return 0;
+}
+
+function isAdminUser(props) {
+	var u = props && props.user;
+	return !!(u && u.is_admin === true);
+}
+
+function readInstalledVersion(props) {
+	var meta = findOwnMeta(props) || {};
+	return meta.installed_version || null;
+}
+
+// Session-scoped banner dismissal. Key includes the available version so a
+// fresh release immediately re-prompts an operator who dismissed the
+// previous version's banner.
+function bannerDismissKey(latestVersion) {
+	return 'fv_hx_banner_dismissed_' + (latestVersion || 'unknown');
+}
+
+function readBannerDismissed(latestVersion) {
+	try {
+		return sessionStorage.getItem(bannerDismissKey(latestVersion)) === '1';
+	} catch (_) {
+		return false;
+	}
+}
+
+function writeBannerDismissed(latestVersion) {
+	try {
+		sessionStorage.setItem(bannerDismissKey(latestVersion), '1');
+	} catch (_) {}
+}
 
 class FaceVaultKYC extends Component {
 	constructor(props) {
@@ -214,6 +314,9 @@ class FaceVaultKYC extends Component {
 			launched: false,
 			fvStatus: null,
 			pollError: null,
+			manifest: null,
+			bannerDismissed: false,
+			updateCopied: false,
 		};
 		this._pollTimer = null;
 		this._pollDeadline = 0;
@@ -227,11 +330,68 @@ class FaceVaultKYC extends Component {
 		if (cfg.slug && this._extId()) {
 			this._startPolling();
 		}
+		// Upgrade-banner fetch — only matters for admin users on a
+		// configured plugin. No point hitting the manifest endpoint
+		// otherwise (would just count against our cache budget).
+		if (cfg.slug && isAdminUser(this.props)) {
+			this._fetchManifest();
+		}
 	}
 
 	componentWillUnmount() {
 		this._stopPolling();
 	}
+
+	_fetchManifest = async () => {
+		const cfg = resolveConfig(this.props);
+		try {
+			const res = await fetch(cfg.apiBase + MANIFEST_PATH, { method: 'GET' });
+			if (!res.ok) return;
+			const data = await res.json();
+			if (!data || !data.latest_version) return;
+			this.setState({
+				manifest: data,
+				bannerDismissed: readBannerDismissed(data.latest_version),
+			});
+		} catch (_) {
+			// CORS/CSP block or transient network failure — banner just
+			// doesn't show. Plugin keeps working normally.
+		}
+	};
+
+	_dismissBanner = () => {
+		const { manifest } = this.state;
+		if (manifest && manifest.latest_version) {
+			writeBannerDismissed(manifest.latest_version);
+		}
+		this.setState({ bannerDismissed: true });
+	};
+
+	// Fetch the latest plugin JSON, copy to clipboard, open operator panel.
+	// We can't actually install the plugin for them — HollaEx doesn't expose
+	// a webview-side admin API for that — but we can compress the upgrade
+	// down to "click banner, switch tabs, paste, save."
+	_handleUpgrade = async () => {
+		const { manifest } = this.state;
+		if (!manifest || !manifest.marketplace_json_url) return;
+		try {
+			const res = await fetch(manifest.marketplace_json_url);
+			if (!res.ok) throw new Error('fetch failed');
+			const jsonText = await res.text();
+			if (navigator.clipboard && navigator.clipboard.writeText) {
+				await navigator.clipboard.writeText(jsonText);
+				this.setState({ updateCopied: true });
+			}
+			// `window.location.origin` is the exchange's own root — the same
+			// origin the operator is already on. HollaEx kits expose the
+			// operator control panel at /operator/ (admin auth required).
+			window.open(window.location.origin + '/operator/', '_blank', 'noopener');
+		} catch (_) {
+			// On failure, at least open the changelog so they can grab the
+			// JSON manually from the GH release page.
+			window.open(manifest.changelog_url, '_blank', 'noopener');
+		}
+	};
 
 	_extId() {
 		const u = this.props.user || {};
@@ -289,7 +449,7 @@ class FaceVaultKYC extends Component {
 
 	render() {
 		const { user } = this.props;
-		const { launched, fvStatus } = this.state;
+		const { launched, fvStatus, manifest, bannerDismissed, updateCopied } = this.state;
 		const cfg = resolveConfig(this.props);
 		const idData = (user && user.id_data) || {};
 		const hxStatus = idData.status || 0;
@@ -307,8 +467,55 @@ class FaceVaultKYC extends Component {
 		const fvStatusInfo = fvStatus ? FV_STATE_LABELS[fvStatus] : null;
 		const statusInfo = showFvBadge ? fvStatusInfo : hxStatusInfo;
 
+		// Banner conditions: admin user, manifest fetched, installed version
+		// strictly older than latest. Missing installed_version (pre-banner
+		// installs) is treated as ancient so the first cohort sees the
+		// banner and upgrades once.
+		const installed = readInstalledVersion(this.props);
+		const showUpdateBanner = !!(
+			isAdminUser(this.props)
+			&& manifest
+			&& manifest.latest_version
+			&& !bannerDismissed
+			&& compareSemver(manifest.latest_version, installed || '0.0.0') > 0
+		);
+
 		return (
 			<div style={STYLES.container}>
+				{showUpdateBanner && (
+					<div style={STYLES.updateBanner}>
+						<svg style={STYLES.updateBannerIcon} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+							<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+							<polyline points="17 8 12 3 7 8" />
+							<line x1="12" y1="3" x2="12" y2="15" />
+						</svg>
+						<div style={STYLES.updateBannerBody}>
+							<div style={STYLES.updateBannerTitle}>
+								Plugin update available — v{manifest.latest_version}
+							</div>
+							<div style={STYLES.updateBannerMeta}>
+								{installed ? `You're on v${installed}` : 'Your installation is on a pre-update version'}
+							</div>
+							<div style={STYLES.updateBannerActions}>
+								<button type="button" style={STYLES.updateBannerCta} onClick={this._handleUpgrade}>
+									Update now
+								</button>
+								<a href={manifest.changelog_url} target="_blank" rel="noopener noreferrer" style={STYLES.updateBannerLink}>
+									What's new
+								</a>
+							</div>
+							{updateCopied && (
+								<div style={STYLES.updateBannerCopied}>
+									New plugin JSON copied — paste in HollaEx Operator → Plugins.
+								</div>
+							)}
+						</div>
+						<button type="button" style={STYLES.updateBannerDismiss} onClick={this._dismissBanner} aria-label="Dismiss">
+							×
+						</button>
+					</div>
+				)}
+
 				<div style={STYLES.logo}>
 					<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
 						<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
