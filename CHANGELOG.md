@@ -5,6 +5,24 @@ All notable changes to the FaceVault HollaEx plugin.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.0.7] — 2026-05-14
+
+### Fixed
+- **Tab strip icon now renders.** HollaEx kit's `Image` component
+  (`web/src/components/Image/index.js`) decides inline-SVG vs `<img>`
+  rendering via `icon.indexOf('.svg') > 0`. A plain
+  `data:image/svg+xml;base64,...` URL fails that check, falls through
+  to `<img>`, and base64-encoded SVG in `<img>` renders unreliably
+  across browsers — the verification tab showed a blank slot next to
+  the FaceVault label. Appending `#shield.svg` is a URL fragment
+  ignored by the data-URL parser but flips the kit's substring check
+  so it routes through ReactSVG and inlines the icon. The shield
+  itself now also inherits `currentColor` so it picks up the kit's
+  active icon colour rather than a fixed green that may not contrast
+  against custom themes.
+- Mirrored in the dashboard JSON generator
+  (`api/app/services/hollaex_plugin.py`).
+
 ## [v2.0.6] — 2026-05-14
 
 ### Added
@@ -146,6 +164,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Webapp URL pattern (`?sid=&st=`) and a build.js regression that produced
   a malformed JSON for non-dashboard installs.
 
+[v2.0.7]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.7
 [v2.0.6]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.6
 [v2.0.5]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.5
 [v2.0.4]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.4

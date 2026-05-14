@@ -52,8 +52,18 @@ const PLACEHOLDER_SLUG = 'configure-via-dashboard';
 // root of the entry they're ignored and HollaEx renders the "under
 // construction" placeholder. (Same regression that hit v1.0.0.)
 const SHIELD_SVG_B64 = Buffer.from(
-	'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>'
+	'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>'
 ).toString('base64');
+
+// HollaEx kit's `Image` component (web/src/components/Image/index.js)
+// decides inline SVG vs <img> rendering via `icon.indexOf('.svg') > 0`.
+// A plain `data:image/svg+xml;base64,...` URL fails that check and falls
+// through to <img>, which renders base64-encoded SVG unreliably across
+// browsers/CSP settings — the tab strip then shows a blank slot instead
+// of our shield. Appending `#shield.svg` is a URL fragment ignored by
+// the data-URL parser, but it makes the kit's substring check pass so
+// ReactSVG inlines our icon properly.
+const SHIELD_ICON_DATA_URL = 'data:image/svg+xml;base64,' + SHIELD_SVG_B64 + '#shield.svg';
 
 // Top-level `public_meta` schema for the marketplace template. HollaEx's
 // Plugins → Configure UI renders inputs from this; the operator-typed value
@@ -129,8 +139,8 @@ const plugin = {
 					en: { FACEVAULT_KYC_VERIFICATION: 'Identity Verification' },
 				},
 				icons: {
-					dark: { FACEVAULT_SHIELD_ICON: 'data:image/svg+xml;base64,' + SHIELD_SVG_B64 },
-					white: { FACEVAULT_SHIELD_ICON: 'data:image/svg+xml;base64,' + SHIELD_SVG_B64 },
+					dark: { FACEVAULT_SHIELD_ICON: SHIELD_ICON_DATA_URL },
+					white: { FACEVAULT_SHIELD_ICON: SHIELD_ICON_DATA_URL },
 				},
 			},
 		},
