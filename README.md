@@ -28,7 +28,7 @@ The webview reads its operator-specific slug from the props HollaEx passes in �
 - Status badge in the user's KYC tab updates live as the verification completes (passed / under review / failed)
 - Operator sees every completed session in the FaceVault dashboard
 - Webhook delivery (Starter+ tier) to the operator's own endpoint with full result payload
-- **Auto-flipping the HollaEx user's verification level on accept** — via the webhook glue below (Cloud + self-hosted), or via the legacy in-process plugin (self-hosted only)
+- **Auto-flipping the HollaEx user's verification level on accept** — via the webhook glue below (Cloud + self-hosted)
 
 ## Install
 
@@ -91,11 +91,7 @@ break operator dashboards.
 
 ## Auto-flipping user verification level
 
-Two paths for promoting users from level 1 → 2 (or whatever target tier) when FaceVault returns `accept`. Both work; pick what fits your stack.
-
-### Path 1 — Webhook glue (HollaEx Cloud or self-hosted, recommended)
-
-Run a small webhook receiver. It takes FaceVault's webhook, verifies the HMAC, and calls HollaEx's admin API to flip the user's verification level. Cloudflare Workers shown below; any serverless platform (Lambda, Cloud Run, plain Express) works.
+Promote users from level 1 → 2 (or whatever target tier) when FaceVault returns `accept` by running a small webhook receiver. It takes FaceVault's webhook, verifies the HMAC, and calls HollaEx's admin API to flip the user's verification level. Works on HollaEx Cloud and self-hosted. Cloudflare Workers shown below; any serverless platform (Lambda, Cloud Run, plain Express) works.
 
 ```js
 // Cloudflare Worker — facevault-to-hollaex glue
@@ -161,10 +157,6 @@ function sortKeys(o) {
 ```
 
 Point your FaceVault site's webhook URL at this Worker. Verifications that complete with `trust_decision: accept` will auto-flip the HollaEx user level.
-
-### Path 2 — Legacy in-process plugin (self-hosted only)
-
-Self-hosted operators who don't want to run a separate webhook receiver can install the [v1.4.3 plugin](https://github.com/khreechari/facevault-hollaex/releases/tag/v1.4.3) — its `server.js` registers a webhook handler that calls `toolsLib.user.changeUserVerificationLevelById` in-process when FaceVault POSTs. Won't work on HollaEx Cloud — Cloud blocks custom plugin server scripts (`/plugins/*` routes return 405).
 
 ## Building from source
 

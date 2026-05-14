@@ -1,11 +1,21 @@
 {
   "name": "facevault-hollaex-plugin",
-  "version": "2.0.4",
+  "version": "2.0.5",
   "description": "FaceVault KYC plugin for HollaEx exchanges (Cloud-compatible hosted-page mode)",
   "private": true,
   "scripts": {
     "build": "node build.js",
-    "build:minify": "node build.js --minify"
+    "build:minify": "node build.js --minify",
+    "test": "jest"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "transform": {
+      "^.+\\.jsx?$": [
+        "babel-jest",
+        { "presets": ["@babel/preset-env", "@babel/preset-react"] }
+      ]
+    }
   },
   "repository": {
     "type": "git",
@@ -19,8 +29,11 @@
   "license": "MIT",
   "devDependencies": {
     "@babel/core": "^7.29.0",
+    "@babel/preset-env": "^7.29.0",
     "@babel/preset-react": "^7.28.5",
+    "babel-jest": "^30.0.0",
     "babel-loader": "^10.1.1",
+    "jest": "^30.0.0",
     "webpack": "^5.105.4",
     "webpack-cli": "^7.0.2"
   }

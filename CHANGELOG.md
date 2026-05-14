@@ -5,6 +5,38 @@ All notable changes to the FaceVault HollaEx plugin.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.0.5] — 2026-05-14
+
+### Added
+- React error boundary at the top of the webview so a render exception
+  can never break the host HollaEx page. Falls back to a small
+  "temporarily unavailable" notice and logs the original error.
+- Origin allowlist on the upgrade-now flow. The marketplace JSON URL
+  is now verified against `github.com` / `facevault.id` before fetch
+  + clipboard write, so a compromised manifest endpoint can't trick
+  an admin into pasting attacker-controlled content into HollaEx admin.
+- Jest test suite for the kit-state, version-compare, and trust-allowlist
+  helpers (34 tests). Wired into CI before the release build.
+
+### Changed
+- Verify CTA is now a real `<button>` (was an `<a>` styled as one). Fixes
+  the case where the disabled-looking pending state was still navigable.
+- Upgrade-now button shows a working state and disables itself while a
+  fetch is in flight, preventing duplicate submissions.
+- Banner dismiss now also clears the "copied" indicator so it doesn't
+  reappear stale when the banner returns next session.
+- Misleading "processed on-premises" copy corrected to reflect the
+  hosted-page architecture: "processed on FaceVault's secure
+  infrastructure".
+- Decorative SVG icons marked `aria-hidden`, contrast bumped on subtle
+  text (note + chip + meta) to clear WCAG AA.
+
+### Fixed
+- README no longer links to a non-existent `v1.4.3` release. Legacy
+  in-process plugin path removed — the webhook glue covers both
+  HollaEx Cloud and self-hosted.
+- Dead `pollError` state removed.
+
 ## [v2.0.4] — 2026-05-14
 
 ### Added
@@ -72,6 +104,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Webapp URL pattern (`?sid=&st=`) and a build.js regression that produced
   a malformed JSON for non-dashboard installs.
 
+[v2.0.5]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.5
 [v2.0.4]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.4
 [v2.0.3]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.3
 [v2.0.2]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.2

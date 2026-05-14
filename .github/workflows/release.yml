@@ -24,6 +24,9 @@ jobs:
 
       - run: npm ci --no-audit --no-fund
 
+      - name: Run tests
+        run: npm test
+
       - name: Build plugin JSONs
         run: |
           node build.js

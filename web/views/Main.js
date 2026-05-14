@@ -19,7 +19,7 @@
  * setups that inject the bundle via a real <script> tag.
  *
  * Props from HollaEx kit:
- *   user           — Current user (id, id_data, full_name, ...)
+ *   user           — Current user (id, id_data, full_name, is_admin, ...)
  *   webViews       — Object keyed by target id; each value is the array of
  *                    plugin web_view entries (with their meta) for that target
  *   id             — Current target id (e.g. 'verification:facevault-kyc:home')
@@ -39,67 +39,16 @@ const _SCRIPT_INFO = (function () {
 })();
 
 import React, { Component } from 'react';
-
-// Walk redux-mapped webViews to find OUR plugin's web_view[0].meta. This is
-// the per-operator (dashboard-generated) JSON path: slug + origins are baked
-// into the JSON at download time.
-function findOwnMeta(props) {
-	try {
-		var wv = props && props.webViews;
-		if (!wv) return null;
-		// Fast path: matching id from props
-		if (props.id && Array.isArray(wv[props.id])) {
-			for (var i = 0; i < wv[props.id].length; i++) {
-				var e = wv[props.id][i];
-				if (e && e.name === 'facevault-kyc' && e.meta) return e.meta;
-			}
-		}
-		// Fallback: scan all targets
-		for (var k in wv) {
-			if (!Object.prototype.hasOwnProperty.call(wv, k)) continue;
-			var arr = wv[k] || [];
-			for (var j = 0; j < arr.length; j++) {
-				var ee = arr[j];
-				if (ee && ee.name === 'facevault-kyc' && ee.meta) return ee.meta;
-			}
-		}
-	} catch (_) {}
-	return null;
-}
-
-// Marketplace-installed plugins use top-level public_meta with operator-
-// configurable schema fields. HollaEx persists the configured value either
-// flat (`public_meta.slug = "acme"`) or schema-shaped (`public_meta.slug =
-// {type, value: "acme", ...}`) — we accept both. enabledPlugins arrives
-// from store.app.enabledPlugins via SmartTarget's mapStateToProps.
-function readMarketplaceField(props, fieldName) {
-	// HollaEx kits store full plugin configs (with public_meta) in `props.plugins`
-	// — an array of plugin objects keyed by `name`. `props.enabledPlugins` is
-	// just an array of activated plugin name strings in this kit version.
-	// We check both for forward/backward compat.
-	try {
-		var lists = [];
-		if (props && Array.isArray(props.plugins)) lists.push(props.plugins);
-		if (props && Array.isArray(props.enabledPlugins)) lists.push(props.enabledPlugins);
-		for (var l = 0; l < lists.length; l++) {
-			var arr = lists[l];
-			for (var i = 0; i < arr.length; i++) {
-				var p = arr[i];
-				if (!p || typeof p !== 'object' || p.name !== 'facevault-kyc') continue;
-				var sources = [p.public_meta, p.meta];
-				for (var s = 0; s < sources.length; s++) {
-					var src = sources[s];
-					if (!src) continue;
-					var raw = src[fieldName];
-					if (raw == null) continue;
-					if (typeof raw === 'string' && raw) return raw;
-					if (typeof raw === 'object' && typeof raw.value === 'string' && raw.value) return raw.value;
-				}
-			}
-		}
-	} catch (_) {}
-	return null;
-}
+import {
+	compareSemver,
+	findOwnMeta,
+	isAdminUser,
+	isTrustedMarketplaceUrl,
+	readBannerDismissed,
+	readInstalledVersion,
+	readMarketplaceField,
+	writeBannerDismissed,
+} from './utils';
 
 // Resolves slug + origins from props (primary) or document.currentScript.src
 // (fallback for self-hosted with <script> tag injection).
@@ -135,6 +84,8 @@ function resolveConfig(props) {
 	return { slug: slug, hostedBase: hostedBase, apiBase: apiBase };
 }
 
+// HollaEx's user.id_data.status uses 0=not verified, 1=pending review,
+// 2=rejected, 3=verified. We mirror that mapping for the in-tab badge.
 const STATUS_LABELS = {
 	0: { text: 'Not Verified', color: '#f87171', bg: 'rgba(248,113,113,0.1)' },
 	1: { text: 'Pending Review', color: '#fbbf24', bg: 'rgba(251,191,36,0.1)' },
@@ -142,6 +93,8 @@ const STATUS_LABELS = {
 	3: { text: 'Verified', color: '#4ade80', bg: 'rgba(74,222,128,0.1)' },
 };
 
+// FaceVault hosted-page session states surfaced via the polling endpoint
+// before HollaEx's id_data has been updated by the operator webhook.
 const FV_STATE_LABELS = {
 	in_progress: { text: 'Verification in progress', color: '#fbbf24', bg: 'rgba(251,191,36,0.1)' },
 	in_review: { text: 'Under review', color: '#fbbf24', bg: 'rgba(251,191,36,0.1)' },
@@ -160,7 +113,7 @@ const STYLES = {
 		display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px',
 	},
 	title: { fontSize: '20px', fontWeight: '700', marginBottom: '8px', textAlign: 'center' },
-	subtitle: { fontSize: '14px', opacity: 0.5, marginBottom: '28px', textAlign: 'center', lineHeight: '1.5' },
+	subtitle: { fontSize: '14px', opacity: 0.6, marginBottom: '28px', textAlign: 'center', lineHeight: '1.5' },
 	badge: {
 		display: 'inline-flex', alignItems: 'center', gap: '6px',
 		padding: '6px 14px', borderRadius: '20px',
@@ -175,9 +128,12 @@ const STYLES = {
 		color: '#0c0c12', fontSize: '15px', fontWeight: '700',
 		cursor: 'pointer', textDecoration: 'none', textAlign: 'center',
 		transition: 'opacity 0.2s',
+		// Keep keyboard nav visible — overrides browser default suppression
+		// on linear-gradient backgrounds.
+		outlineOffset: '2px',
 	},
 	buttonDisabled: { opacity: 0.5, cursor: 'not-allowed' },
-	note: { fontSize: '12px', opacity: 0.4, marginTop: '20px', textAlign: 'center', lineHeight: '1.5' },
+	note: { fontSize: '12px', opacity: 0.6, marginTop: '20px', textAlign: 'center', lineHeight: '1.5' },
 	features: {
 		display: 'flex', gap: '12px', flexWrap: 'wrap',
 		justifyContent: 'center', marginBottom: '28px',
@@ -186,7 +142,7 @@ const STYLES = {
 		display: 'inline-flex', alignItems: 'center', gap: '4px',
 		padding: '4px 10px', borderRadius: '16px',
 		background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
-		fontSize: '11px', opacity: 0.5,
+		fontSize: '11px', opacity: 0.6,
 	},
 	verifiedCard: {
 		width: '100%', padding: '16px 20px', borderRadius: '12px',
@@ -196,6 +152,12 @@ const STYLES = {
 	launchedNote: {
 		fontSize: '13px', color: 'rgba(255,255,255,0.7)',
 		background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.15)',
+		borderRadius: '8px', padding: '12px 14px', marginTop: '16px',
+		textAlign: 'center', width: '100%', boxSizing: 'border-box',
+	},
+	launchedNoteError: {
+		fontSize: '13px', color: '#f87171',
+		background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.15)',
 		borderRadius: '8px', padding: '12px 14px', marginTop: '16px',
 		textAlign: 'center', width: '100%', boxSizing: 'border-box',
 	},
@@ -215,7 +177,7 @@ const STYLES = {
 		fontSize: '13px', fontWeight: '600', color: '#22d3ee', marginBottom: '2px',
 	},
 	updateBannerMeta: {
-		fontSize: '12px', opacity: 0.6, marginBottom: '8px',
+		fontSize: '12px', opacity: 0.7, marginBottom: '8px',
 	},
 	updateBannerActions: {
 		display: 'flex', gap: '8px', flexWrap: 'wrap',
@@ -228,16 +190,17 @@ const STYLES = {
 		color: '#22d3ee',
 		border: '1px solid rgba(34,211,238,0.25)',
 	},
+	updateBannerCtaDisabled: { opacity: 0.5, cursor: 'wait' },
 	updateBannerLink: {
 		display: 'inline-flex', alignItems: 'center',
 		padding: '6px 10px', borderRadius: '6px',
 		fontSize: '12px', fontWeight: '500',
-		color: 'rgba(255,255,255,0.6)',
+		color: 'rgba(255,255,255,0.7)',
 		textDecoration: 'none', background: 'transparent',
 	},
 	updateBannerDismiss: {
 		appearance: 'none', background: 'transparent', border: 'none',
-		color: 'rgba(255,255,255,0.4)', cursor: 'pointer',
+		color: 'rgba(255,255,255,0.5)', cursor: 'pointer',
 		fontSize: '18px', lineHeight: '1', padding: '0 4px',
 	},
 	updateBannerCopied: {
@@ -255,67 +218,16 @@ const POLL_TIMEOUT_MS = 30 * 60 * 1000;
 // on stale versions see an upgrade banner above the verify button.
 const MANIFEST_PATH = '/api/v1/integrations/hollaex/manifest';
 
-// Lexicographic semver comparison sufficient for our `X.Y.Z` releases.
-// Returns positive if a > b, negative if a < b, 0 if equal. Defensive
-// against missing/non-numeric inputs (treats them as 0).
-function compareSemver(a, b) {
-	var parse = function (v) {
-		var parts = String(v || '0.0.0').split('.');
-		return [
-			parseInt(parts[0], 10) || 0,
-			parseInt(parts[1], 10) || 0,
-			parseInt(parts[2], 10) || 0,
-		];
-	};
-	var pa = parse(a);
-	var pb = parse(b);
-	for (var i = 0; i < 3; i++) {
-		if (pa[i] !== pb[i]) return pa[i] - pb[i];
-	}
-	return 0;
-}
-
-function isAdminUser(props) {
-	var u = props && props.user;
-	return !!(u && u.is_admin === true);
-}
-
-function readInstalledVersion(props) {
-	var meta = findOwnMeta(props) || {};
-	return meta.installed_version || null;
-}
-
-// Session-scoped banner dismissal. Key includes the available version so a
-// fresh release immediately re-prompts an operator who dismissed the
-// previous version's banner.
-function bannerDismissKey(latestVersion) {
-	return 'fv_hx_banner_dismissed_' + (latestVersion || 'unknown');
-}
-
-function readBannerDismissed(latestVersion) {
-	try {
-		return sessionStorage.getItem(bannerDismissKey(latestVersion)) === '1';
-	} catch (_) {
-		return false;
-	}
-}
-
-function writeBannerDismissed(latestVersion) {
-	try {
-		sessionStorage.setItem(bannerDismissKey(latestVersion), '1');
-	} catch (_) {}
-}
-
 class FaceVaultKYC extends Component {
 	constructor(props) {
 		super(props);
 		this.state = {
 			launched: false,
 			fvStatus: null,
-			pollError: null,
 			manifest: null,
 			bannerDismissed: false,
 			updateCopied: false,
+			upgradeInFlight: false,
 		};
 		this._pollTimer = null;
 		this._pollDeadline = 0;
@@ -363,16 +275,29 @@ class FaceVaultKYC extends Component {
 		if (manifest && manifest.latest_version) {
 			writeBannerDismissed(manifest.latest_version);
 		}
-		this.setState({ bannerDismissed: true });
+		this.setState({ bannerDismissed: true, updateCopied: false });
 	};
 
 	// Fetch the latest plugin JSON, copy to clipboard, open operator panel.
 	// We can't actually install the plugin for them — HollaEx doesn't expose
 	// a webview-side admin API for that — but we can compress the upgrade
 	// down to "click banner, switch tabs, paste, save."
+	//
+	// The marketplace_json_url is checked against a trusted-origin allowlist
+	// before fetch: if the manifest endpoint is ever compromised, we must
+	// not write attacker-controlled content to the operator's clipboard.
 	_handleUpgrade = async () => {
-		const { manifest } = this.state;
+		const { manifest, upgradeInFlight } = this.state;
+		if (upgradeInFlight) return;
 		if (!manifest || !manifest.marketplace_json_url) return;
+		if (!isTrustedMarketplaceUrl(manifest.marketplace_json_url)) {
+			// Refuse to fetch from an untrusted origin. Fall back to the
+			// changelog page so the admin can grab assets from a known
+			// source manually.
+			window.open(manifest.changelog_url, '_blank', 'noopener,noreferrer');
+			return;
+		}
+		this.setState({ upgradeInFlight: true, updateCopied: false });
 		try {
 			const res = await fetch(manifest.marketplace_json_url);
 			if (!res.ok) throw new Error('fetch failed');
@@ -381,14 +306,17 @@ class FaceVaultKYC extends Component {
 				await navigator.clipboard.writeText(jsonText);
 				this.setState({ updateCopied: true });
 			}
-			// `window.location.origin` is the exchange's own root — the same
-			// origin the operator is already on. HollaEx kits expose the
-			// operator control panel at /operator/ (admin auth required).
-			window.open(window.location.origin + '/operator/', '_blank', 'noopener');
+			// HollaEx kits commonly serve the operator panel at /operator/
+			// on the same origin the user is currently on. Some kit variants
+			// route admin differently; on those, this opens a 404 in a new
+			// tab and the admin navigates manually from the home page.
+			window.open(window.location.origin + '/operator/', '_blank', 'noopener,noreferrer');
 		} catch (_) {
 			// On failure, at least open the changelog so they can grab the
 			// JSON manually from the GH release page.
-			window.open(manifest.changelog_url, '_blank', 'noopener');
+			window.open(manifest.changelog_url, '_blank', 'noopener,noreferrer');
+		} finally {
+			this.setState({ upgradeInFlight: false });
 		}
 	};
 
@@ -410,7 +338,7 @@ class FaceVaultKYC extends Component {
 			if (!res.ok) return;
 			const data = await res.json();
 			if (data && data.status) {
-				this.setState({ fvStatus: data.status, pollError: null });
+				this.setState({ fvStatus: data.status });
 				if (data.status === 'passed' || data.status === 'failed' || data.status === 'in_review') {
 					this._stopPolling();
 				}
@@ -435,20 +363,21 @@ class FaceVaultKYC extends Component {
 	};
 
 	_buildVerifyUrl(cfg) {
-		if (!cfg.slug) return cfg.hostedBase;
 		const ext = this._extId();
 		const refQs = ext ? ('?ref=' + encodeURIComponent(ext)) : '';
 		return cfg.hostedBase + '/v/' + encodeURIComponent(cfg.slug) + refQs;
 	}
 
-	handleVerifyClick = () => {
+	_launchVerify = (cfg) => {
+		const url = this._buildVerifyUrl(cfg);
+		window.open(url, '_blank', 'noopener,noreferrer');
 		this.setState({ launched: true });
 		this._startPolling();
 	};
 
 	render() {
 		const { user } = this.props;
-		const { launched, fvStatus, manifest, bannerDismissed, updateCopied } = this.state;
+		const { launched, fvStatus, manifest, bannerDismissed, updateCopied, upgradeInFlight } = this.state;
 		const cfg = resolveConfig(this.props);
 		const idData = (user && user.id_data) || {};
 		const hxStatus = idData.status || 0;
@@ -479,11 +408,13 @@ class FaceVaultKYC extends Component {
 			&& compareSemver(manifest.latest_version, installed || '0.0.0') > 0
 		);
 
+		const ctaLabel = isRejected ? 'Retry Verification' : (launched ? 'Reopen Verification' : 'Verify My Identity');
+
 		return (
 			<div style={STYLES.container}>
 				{showUpdateBanner && (
 					<div style={STYLES.updateBanner}>
-						<svg style={STYLES.updateBannerIcon} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+						<svg aria-hidden="true" style={STYLES.updateBannerIcon} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
 							<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
 							<polyline points="17 8 12 3 7 8" />
 							<line x1="12" y1="3" x2="12" y2="15" />
@@ -496,8 +427,17 @@ class FaceVaultKYC extends Component {
 								{installed ? `You're on v${installed}` : 'Your installation is on a pre-update version'}
 							</div>
 							<div style={STYLES.updateBannerActions}>
-								<button type="button" style={STYLES.updateBannerCta} onClick={this._handleUpgrade}>
-									Update now
+								<button
+									type="button"
+									disabled={upgradeInFlight}
+									aria-busy={upgradeInFlight || undefined}
+									style={{
+										...STYLES.updateBannerCta,
+										...(upgradeInFlight ? STYLES.updateBannerCtaDisabled : {}),
+									}}
+									onClick={this._handleUpgrade}
+								>
+									{upgradeInFlight ? 'Working…' : 'Update now'}
 								</button>
 								<a href={manifest.changelog_url} target="_blank" rel="noopener noreferrer" style={STYLES.updateBannerLink}>
 									What's new
@@ -509,14 +449,14 @@ class FaceVaultKYC extends Component {
 								</div>
 							)}
 						</div>
-						<button type="button" style={STYLES.updateBannerDismiss} onClick={this._dismissBanner} aria-label="Dismiss">
+						<button type="button" style={STYLES.updateBannerDismiss} onClick={this._dismissBanner} aria-label="Dismiss update banner">
 							×
 						</button>
 					</div>
 				)}
 
 				<div style={STYLES.logo}>
-					<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+					<svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
 						<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
 						<path d="M9 12l2 2 4-4" />
 					</svg>
@@ -541,14 +481,12 @@ class FaceVaultKYC extends Component {
 						<div style={{ fontSize: '14px', fontWeight: '600', color: '#4ade80', marginBottom: '4px' }}>
 							Verification Complete
 						</div>
-						<div style={{ fontSize: '12px', opacity: 0.5 }}>Powered by FaceVault</div>
+						<div style={{ fontSize: '12px', opacity: 0.6 }}>Powered by FaceVault</div>
 					</div>
 				)}
 
 				{isRejected && note && (
-					<div style={{ ...STYLES.launchedNote, color: '#f87171', borderColor: 'rgba(248,113,113,0.15)', background: 'rgba(248,113,113,0.06)' }}>
-						{note}
-					</div>
+					<div style={STYLES.launchedNoteError}>{note}</div>
 				)}
 
 				{!isVerified && !isPending && (
@@ -561,28 +499,31 @@ class FaceVaultKYC extends Component {
 				)}
 
 				{!isVerified && !slugMissing && !userMissing && (
-					<a
-						href={this._buildVerifyUrl(cfg)}
-						target="_blank"
-						rel="noopener noreferrer"
-						style={{ ...STYLES.button, ...(isPending ? STYLES.buttonDisabled : {}) }}
-						onClick={this.handleVerifyClick}
+					<button
+						type="button"
+						disabled={isPending}
+						aria-disabled={isPending || undefined}
+						style={{
+							...STYLES.button,
+							...(isPending ? STYLES.buttonDisabled : {}),
+						}}
+						onClick={isPending ? undefined : () => this._launchVerify(cfg)}
 					>
-						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+						<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
 							<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
 						</svg>
-						{isRejected ? 'Retry Verification' : (launched ? 'Reopen Verification' : 'Verify My Identity')}
-					</a>
+						{ctaLabel}
+					</button>
 				)}
 
 				{slugMissing && (
-					<div style={{ ...STYLES.launchedNote, color: '#f87171', borderColor: 'rgba(248,113,113,0.15)', background: 'rgba(248,113,113,0.06)' }}>
+					<div style={STYLES.launchedNoteError}>
 						Plugin not configured — administrator needs to download a customized plugin from the FaceVault dashboard.
 					</div>
 				)}
 
 				{userMissing && !slugMissing && (
-					<div style={{ ...STYLES.launchedNote, color: '#f87171', borderColor: 'rgba(248,113,113,0.15)', background: 'rgba(248,113,113,0.06)' }}>
+					<div style={STYLES.launchedNoteError}>
 						Sign in required. Please refresh and try again.
 					</div>
 				)}
@@ -595,7 +536,7 @@ class FaceVaultKYC extends Component {
 
 				<div style={STYLES.note}>
 					{isVerified
-						? 'Your data is encrypted at rest and processed on-premises.'
+						? 'Your data is encrypted at rest and processed on FaceVault\'s secure infrastructure.'
 						: 'Takes about 2 minutes. You\'ll need a valid ID and your camera.'}
 				</div>
 			</div>
@@ -603,4 +544,38 @@ class FaceVaultKYC extends Component {
 	}
 }
 
-export default FaceVaultKYC;
+// Error boundary so a render exception in the plugin can't break the host
+// HollaEx page. The fallback is intentionally minimal — operators can
+// inspect the browser console for the original error.
+class FaceVaultKYCErrorBoundary extends Component {
+	constructor(props) {
+		super(props);
+		this.state = { error: null };
+	}
+
+	static getDerivedStateFromError(error) {
+		return { error: error };
+	}
+
+	componentDidCatch(error, info) {
+		if (typeof console !== 'undefined' && console.error) {
+			console.error('[facevault-kyc] webview error:', error, info);
+		}
+	}
+
+	render() {
+		if (this.state.error) {
+			return (
+				<div style={STYLES.container}>
+					<div style={STYLES.title}>Identity Verification</div>
+					<div style={STYLES.launchedNoteError}>
+						Identity verification is temporarily unavailable. Please refresh the page or try again later.
+					</div>
+				</div>
+			);
+		}
+		return <FaceVaultKYC {...this.props} />;
+	}
+}
+
+export default FaceVaultKYCErrorBoundary;
