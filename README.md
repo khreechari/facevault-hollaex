@@ -48,7 +48,7 @@ If you installed FaceVault from HollaEx's App Store — or want the generic JSON
 
 Direct download (latest):
 
-- [`facevault-kyc.marketplace.json`](https://github.com/khreechari/facevault-hollaex/releases/download/v2.0.3/facevault-kyc.marketplace.json) — also live at [`facevault.id/facevault-kyc.marketplace.json`](https://facevault.id/facevault-kyc.marketplace.json)
+- [`facevault-kyc.marketplace.json`](https://github.com/khreechari/facevault-hollaex/releases/latest/download/facevault-kyc.marketplace.json) — always points at the latest release. Also mirrored at [`facevault.id/facevault-kyc.marketplace.json`](https://facevault.id/facevault-kyc.marketplace.json).
 
 After installing it in HollaEx:
 

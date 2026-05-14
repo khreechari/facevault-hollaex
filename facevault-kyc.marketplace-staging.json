@@ -1,0 +1,59 @@
+{
+  "name": "facevault-kyc",
+  "version": 1,
+  "type": "external_kyc",
+  "author": "FaceVault",
+  "bio": "AI-powered identity verification.",
+  "description": "STAGING build. Identity verification powered by FaceVault — staging environment (staging.facevault.id / api-staging.facevault.id). After install, set your slug in Configure.",
+  "documentation": "https://facevault.id/docs",
+  "logo": "https://facevault.id/logo-shield.png",
+  "icon": "https://facevault.id/favicon.svg",
+  "url": "https://facevault.id",
+  "meta": {},
+  "public_meta": {
+    "slug": {
+      "type": "string",
+      "required": true,
+      "description": "Your FaceVault hosted-page slug (e.g. \"acme\"). Sign up at devdash.facevault.id, create a hosted-verification site, and paste the slug here.",
+      "value": ""
+    }
+  },
+  "prescript": {
+    "install": [],
+    "run": null
+  },
+  "postscript": {
+    "run": null
+  },
+  "web_view": [
+    {
+      "src": "https://staging.facevault.id/plugins/facevault-kyc-view.js?v=8",
+      "meta": {
+        "is_verification_tab": true,
+        "type": "home",
+        "string": {
+          "id": "FACEVAULT_KYC_VERIFICATION"
+        },
+        "icon": {
+          "id": "FACEVAULT_SHIELD_ICON"
+        },
+        "strings": {
+          "en": {
+            "FACEVAULT_KYC_VERIFICATION": "Identity Verification"
+          }
+        },
+        "icons": {
+          "dark": {
+            "FACEVAULT_SHIELD_ICON": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNGFkZTgwIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMTIgMjJzOC00IDgtMTBWNWwtOC0zLTggM3Y3YzAgNiA4IDEwIDggMTB6Ii8+PHBhdGggZD0iTTkgMTJsMiAyIDQtNCIvPjwvc3ZnPg=="
+          },
+          "white": {
+            "FACEVAULT_SHIELD_ICON": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNGFkZTgwIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMTIgMjJzOC00IDgtMTBWNWwtOC0zLTggM3Y3YzAgNiA4IDEwIDggMTB6Ii8+PHBhdGggZD0iTTkgMTJsMiAyIDQtNCIvPjwvc3ZnPg=="
+          }
+        },
+        "hosted_base": "https://staging.facevault.id",
+        "api_base": "https://api-staging.facevault.id"
+      }
+    }
+  ],
+  "admin_view": null
+}

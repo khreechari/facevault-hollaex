@@ -1,0 +1,51 @@
+name: Release plugin artifacts
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Build plugin JSONs (all variants)
+        run: |
+          node build.js
+          node build.js --marketplace
+          node build.js --marketplace --staging
+
+      - name: Build webview bundle
+        run: npx webpack
+
+      - name: SHA256 checksums
+        run: |
+          sha256sum \
+            facevault-kyc.json \
+            facevault-kyc.marketplace.json \
+            facevault-kyc.marketplace-staging.json \
+            dist/facevault-kyc-view.js \
+            > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            facevault-kyc.json
+            facevault-kyc.marketplace.json
+            facevault-kyc.marketplace-staging.json
+            dist/facevault-kyc-view.js
+            SHA256SUMS.txt
+          fail_on_unmatched_files: true
