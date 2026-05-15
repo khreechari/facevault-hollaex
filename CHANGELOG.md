@@ -5,6 +5,21 @@ All notable changes to the FaceVault HollaEx plugin.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.0.8] — 2026-05-15
+
+### Fixed
+- **Tab strip icon, take two — the v2.0.7 fix didn't hold.** Appending
+  `#shield.svg` to the `data:` URI did flip the kit's `.svg` substring
+  check and route the icon into react-inlinesvg instead of `<img>` — but
+  react-inlinesvg *fetches* the icon string, and it can't fetch a `data:`
+  URI, so it silently left the tab placeholder un-injected (DOM-confirmed
+  on HollaEx kit 2.17.6). Replaced the inline base64 data URI with a real
+  hosted asset, `https://facevault.id/plugins/facevault-shield.svg`
+  (served with `access-control-allow-origin: *` since the kit fetches it
+  cross-origin; `.svg` extension kept so the kit still routes it to the
+  injector). The SVG ships as a release asset and `sync-hollaex-plugin.sh`
+  deploys it beside the bundle.
+
 ## [v2.0.7] — 2026-05-14
 
 ### Fixed

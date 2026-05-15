@@ -1,6 +1,6 @@
 {
   "name": "facevault-hollaex-plugin",
-  "version": "2.0.7",
+  "version": "2.0.8",
   "description": "FaceVault KYC plugin for HollaEx exchanges (Cloud-compatible hosted-page mode)",
   "private": true,
   "scripts": {

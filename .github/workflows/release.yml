@@ -41,6 +41,7 @@ jobs:
             facevault-kyc.json \
             facevault-kyc.marketplace.json \
             dist/facevault-kyc-view.js \
+            public/plugins/facevault-shield.svg \
             > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
@@ -69,6 +70,7 @@ jobs:
             facevault-kyc.json
             facevault-kyc.marketplace.json
             dist/facevault-kyc-view.js
+            public/plugins/facevault-shield.svg
             SHA256SUMS.txt
           fail_on_unmatched_files: true
           body_path: release-body.md
