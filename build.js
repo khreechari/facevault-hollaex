@@ -142,6 +142,13 @@ const plugin = {
 				// prompt admins about a newer release. Compared against
 				// /api/v1/integrations/hollaex/manifest's latest_version.
 				installed_version: PKG_VERSION,
+				// Where the upgrade-now action opens the operator to paste the
+				// new JSON. Default in the bundle is the open-source kit's
+				// `/operator/`; HollaEx Cloud serves plugin management at
+				// `/admin/plugins` (confirmed on a live Cloud exchange), and
+				// `/operator/` there just SPA-redirects to `/account`. Sanitised
+				// bundle-side to same-origin absolute paths only.
+				operator_path: '/admin/plugins',
 				// `string.id` and `icon.id` are LOOKUP KEYS the kit globalizes
 				// (utils/id.js → generateGlobalId) and dereferences against
 				// the in-app STRINGS / ICONS registries. The actual text and

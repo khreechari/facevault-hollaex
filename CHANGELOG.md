@@ -5,6 +5,22 @@ All notable changes to the FaceVault HollaEx plugin.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.0.10] — 2026-05-16
+
+### Fixed
+
+- **Upgrade-now landed on `/account` instead of the plugin page on
+  HollaEx Cloud.** `web_view[0].meta.operator_path` was unset, so the
+  bundle fell back to the open-source kit's `/operator/` route. HollaEx
+  Cloud serves plugin management at `/admin/plugins` (confirmed on a
+  live Cloud exchange); `/operator/` there just SPA-redirects to
+  `/account`. Both the dashboard-generated JSON
+  (`api/app/services/hollaex_plugin.py`) and the generic + marketplace
+  templates now set `operator_path: /admin/plugins`, so after "Update
+  now" copies the JSON the operator lands directly on the plugin page.
+  Sanitised bundle-side to same-origin absolute paths only (unchanged).
+  No webview/bundle change — cache-buster stays `?v=9`.
+
 ## [v2.0.9] — 2026-05-16
 
 ### Fixed
