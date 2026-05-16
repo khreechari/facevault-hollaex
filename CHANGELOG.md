@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [v2.0.9] — 2026-05-16
 
 ### Fixed
+
 - **Upgrade banner never reached HollaEx Cloud operators.** The banner
   fetch and render were gated on `user.is_admin === true`. A live capture
   of an operator-Admin session on HollaEx Cloud (kit 2.17.6) confirmed the
@@ -20,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one request per mount); the banner *render* uses a new
   `isOperatorOrAdmin` check that recognises the permissions array and still
   honours legacy `is_admin === true` for older / self-hosted kits.
+
 - **Native "Manually upgrade" was a permanent no-op.** The plugin's
   top-level integer `version` was hardcoded to `1` on every release. The
   kit upgrades a plugin only when the submitted `version` differs from the
@@ -35,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   correct for every future release.
 
 ### Changed
+
 - Webview bundle cache-buster bumped to `?v=9` (bundle changed).
 
 ## [v2.0.8] — 2026-05-15

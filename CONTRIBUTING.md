@@ -41,6 +41,12 @@ attached to the GitHub release. Don't commit it.
   regressions (which have shipped to prod twice).
 - Bump `package.json` `version` and add a `CHANGELOG.md` entry only
   if you are explicitly cutting a release.
+- The release workflow publishes the matching `CHANGELOG.md` section
+  verbatim as the GitHub release body (`body_path`). Keep a blank line
+  after each `###` heading and between top-level bullets — GitHub
+  renders a heading with a bullet jammed directly under it as cramped
+  prose. Never wrap the section in a ``` ``` ``` fence; an unclosed one
+  makes the whole release page render as a code block.
 - Keep the public surface of `web_view[0].meta` stable. Adding new
   fields is fine; renaming or removing existing ones breaks every
   installed JSON in the wild.
