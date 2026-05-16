@@ -11,7 +11,7 @@
 const {
 	compareSemver,
 	findOwnMeta,
-	isAdminUser,
+	isOperatorOrAdmin,
 	isTrustedMarketplaceUrl,
 	readBannerDismissed,
 	readInstalledVersion,
@@ -55,20 +55,39 @@ describe('compareSemver', () => {
 	});
 });
 
-describe('isAdminUser', () => {
-	test('true when user.is_admin === true', () => {
-		expect(isAdminUser({ user: { is_admin: true } })).toBe(true);
+describe('isOperatorOrAdmin', () => {
+	// The real HollaEx Cloud operator shape (captured 2026-05-16): no
+	// is_admin anywhere, operator status carried by a permissions array of
+	// "/admin/<area>:<verb>" strings.
+	test('true for Cloud operator (permissions array with /admin/ entries)', () => {
+		expect(isOperatorOrAdmin({
+			user: { permissions: ['/admin/kit:get', '/admin/users:get'] },
+		})).toBe(true);
 	});
-	test('false for any non-true value (no truthy-coercion)', () => {
-		expect(isAdminUser({ user: { is_admin: false } })).toBe(false);
-		expect(isAdminUser({ user: { is_admin: 1 } })).toBe(false);
-		expect(isAdminUser({ user: { is_admin: 'true' } })).toBe(false);
-		expect(isAdminUser({ user: { is_admin: undefined } })).toBe(false);
+	test('true via legacy is_admin === true (older / self-hosted kits)', () => {
+		expect(isOperatorOrAdmin({ user: { is_admin: true } })).toBe(true);
 	});
-	test('false when user missing', () => {
-		expect(isAdminUser({})).toBe(false);
-		expect(isAdminUser(null)).toBe(false);
-		expect(isAdminUser(undefined)).toBe(false);
+	test('false for plain trading user (no permissions array)', () => {
+		expect(isOperatorOrAdmin({ user: { id: 5, email: 'x@y.z' } })).toBe(false);
+	});
+	test('false for empty permissions array', () => {
+		expect(isOperatorOrAdmin({ user: { permissions: [] } })).toBe(false);
+	});
+	test('false when permissions has no /admin/-prefixed entry', () => {
+		expect(isOperatorOrAdmin({ user: { permissions: ['can_read', '/public/x'] } })).toBe(false);
+	});
+	test('non-string permission entries do not throw', () => {
+		expect(isOperatorOrAdmin({ user: { permissions: [null, 42, '/admin/kit:get'] } })).toBe(true);
+		expect(isOperatorOrAdmin({ user: { permissions: [null, 42, {}] } })).toBe(false);
+	});
+	test('legacy flag only counts when strictly true (no truthy-coercion)', () => {
+		expect(isOperatorOrAdmin({ user: { is_admin: 1 } })).toBe(false);
+		expect(isOperatorOrAdmin({ user: { is_admin: 'true' } })).toBe(false);
+	});
+	test('false when user / props missing (defensive)', () => {
+		expect(isOperatorOrAdmin({})).toBe(false);
+		expect(isOperatorOrAdmin(null)).toBe(false);
+		expect(isOperatorOrAdmin(undefined)).toBe(false);
 	});
 });
 

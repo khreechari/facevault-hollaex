@@ -38,10 +38,26 @@ const PKG_VERSION = JSON.parse(
 	fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')
 ).version;
 
+// Plugin top-level integer `version`. HollaEx kit's native "Manually
+// upgrade" does a STRICT-EQUALITY check on this
+// (server/plugins/controllers.js: `if (plugin.version === version) throw
+// 'Version is already installed'`) — it is NOT ordered and NOT marketplace
+// identity (that's name + type). Shipping a hardcoded `1` every release
+// made native upgrade a permanent no-op. Derive a monotonic integer from
+// the semver so every release differs and the kit accepts the update.
+// 2.0.9 -> 20009. Kept in lockstep with the dashboard generator in
+// api/app/services/hollaex_plugin.py.
+const VERSION_INT = (() => {
+	const [maj, min, pat] = String(PKG_VERSION)
+		.split('.')
+		.map((n) => parseInt(n, 10) || 0);
+	return maj * 10000 + min * 100 + pat;
+})();
+
 const WEBVIEW_BUNDLE_BASE = 'https://facevault.id/plugins/facevault-kyc-view.js';
 // Cache-buster version. Bump when the webview bundle changes so HollaEx kits
 // re-fetch instead of serving the CF-cached prior bundle.
-const BUNDLE_VERSION = 8;
+const BUNDLE_VERSION = 9;
 // Sentinel slug that the webview detects and renders as "plugin not configured"
 // — same UX as missing slug, since the bundle treats placeholder as "no slug
 // available." Keeps the generic template safely non-functional.
@@ -92,7 +108,7 @@ const MARKETPLACE_PUBLIC_META = {
 // routes are 405 on Cloud anyway and we ship no server.js.
 const plugin = {
 	name: 'facevault-kyc',
-	version: 1,
+	version: VERSION_INT,
 	type: 'external_kyc',
 	author: 'FaceVault',
 	bio: 'AI-powered identity verification.',

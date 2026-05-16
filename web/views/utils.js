@@ -26,9 +26,19 @@ export function compareSemver(a, b) {
 	return 0;
 }
 
-export function isAdminUser(props) {
-	const u = props && props.user;
-	return !!(u && u.is_admin === true);
+// HollaEx Cloud operators have NO `user.is_admin` flag. The kit only sets
+// `user.permissions` — an array of "/admin/<area>:<verb>" strings — when the
+// user's role matches a defined operator role (server/api/controllers/
+// user.js:1013-1018); plain trading users get no permissions array at all.
+// Older / self-hosted kits may still expose `is_admin === true`, so accept
+// both. Used to gate the upgrade-banner *render* (the fetch is slug-only).
+export function isOperatorOrAdmin(props) {
+	const u = (props && props.user) || {};
+	if (u.is_admin === true) return true;
+	const perms = u.permissions;
+	return Array.isArray(perms) && perms.some(
+		(p) => typeof p === 'string' && p.indexOf('/admin/') === 0
+	);
 }
 
 // Walk redux-mapped webViews to find our plugin's web_view[0].meta. Used

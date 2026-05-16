@@ -42,7 +42,7 @@ import React, { Component } from 'react';
 import {
 	compareSemver,
 	findOwnMeta,
-	isAdminUser,
+	isOperatorOrAdmin,
 	isTrustedMarketplaceUrl,
 	readBannerDismissed,
 	readInstalledVersion,
@@ -255,10 +255,14 @@ class FaceVaultKYC extends Component {
 		if (cfg.slug && this._extId()) {
 			this._startPolling();
 		}
-		// Upgrade-banner fetch — only matters for admin users on a
-		// configured plugin. No point hitting the manifest endpoint
-		// otherwise (would just count against our cache budget).
-		if (cfg.slug && isAdminUser(this.props)) {
+		// Upgrade-banner data fetch — gated on slug only, NOT on operator
+		// status. HollaEx Cloud doesn't expose operator/admin context as a
+		// boolean at mount (no user.is_admin; permissions land late), so
+		// gating the fetch on it is what hid the banner from the very
+		// operators who can act on it. The manifest is cheap (server-side
+		// Redis-cached, one fetch per mount). The banner *render* is what's
+		// restricted to operators — see isOperatorOrAdmin in render().
+		if (cfg.slug) {
 			this._fetchManifest();
 		}
 		if (typeof document !== 'undefined' && document.addEventListener) {
@@ -468,13 +472,13 @@ class FaceVaultKYC extends Component {
 		const fvStatusInfo = fvStatus ? FV_STATE_LABELS[fvStatus] : null;
 		const statusInfo = showFvBadge ? fvStatusInfo : hxStatusInfo;
 
-		// Banner conditions: admin user, manifest fetched, installed version
-		// strictly older than latest. Missing installed_version (pre-banner
+		// Banner conditions: operator/admin viewer, manifest fetched, installed
+		// version strictly older than latest. Missing installed_version (pre-banner
 		// installs) is treated as ancient so the first cohort sees the
 		// banner and upgrades once.
 		const installed = readInstalledVersion(this.props);
 		const showUpdateBanner = !!(
-			isAdminUser(this.props)
+			isOperatorOrAdmin(this.props)
 			&& manifest
 			&& manifest.latest_version
 			&& !bannerDismissed
