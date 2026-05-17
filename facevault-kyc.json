@@ -1,6 +1,6 @@
 {
   "name": "facevault-kyc",
-  "version": 20010,
+  "version": 20011,
   "type": "external_kyc",
   "author": "FaceVault",
   "bio": "AI-powered identity verification.",
@@ -24,7 +24,7 @@
       "meta": {
         "is_verification_tab": true,
         "type": "home",
-        "installed_version": "2.0.10",
+        "installed_version": "2.0.11",
         "operator_path": "/admin/plugins",
         "string": {
           "id": "FACEVAULT_KYC_VERIFICATION"

@@ -5,6 +5,32 @@ All notable changes to the FaceVault HollaEx plugin.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.0.11] — 2026-05-17
+
+### Added
+
+- **Component render tests for the upgrade banner and clipboard flow.**
+  `utils.test.js` covers the pure helpers, but the React component itself —
+  the banner-gating booleans in `render()` and the `_handleUpgrade`
+  clipboard / operator-panel deep link — had no automated guard, and every
+  bug in the HollaEx Cloud upgrade-path work (admin gate, version pin, CORS
+  fetch, `operator_path`) surfaced in exactly that code. A new
+  `web/views/__tests__/Main.test.js` (jsdom) asserts: the banner is hidden
+  for trading users and shown for operators only when a newer version
+  exists, dismiss is version-scoped, the verify CTA is inert while review
+  is pending, the error boundary renders its fallback on an inner throw,
+  and `_handleUpgrade` refuses an untrusted `marketplace_json_url` while a
+  trusted one copies the JSON and opens `/admin/plugins`.
+
+### Changed
+
+- Test-only devDependencies added (`react`, `react-dom`,
+  `@testing-library/react`, `@testing-library/jest-dom`,
+  `jest-environment-jsdom`). `react` / `react-dom` are externalised by
+  webpack (peers of the HollaEx kit), so the shipped bundle is byte-for-byte
+  unchanged and the cache-buster stays `?v=9`. No runtime dependency was
+  added — the zero-runtime-deps posture is intact.
+
 ## [v2.0.10] — 2026-05-16
 
 ### Fixed
