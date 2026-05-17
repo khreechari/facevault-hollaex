@@ -57,7 +57,7 @@ const VERSION_INT = (() => {
 const WEBVIEW_BUNDLE_BASE = 'https://facevault.id/plugins/facevault-kyc-view.js';
 // Cache-buster version. Bump when the webview bundle changes so HollaEx kits
 // re-fetch instead of serving the CF-cached prior bundle.
-const BUNDLE_VERSION = 9;
+const BUNDLE_VERSION = 10;
 // Sentinel slug that the webview detects and renders as "plugin not configured"
 // — same UX as missing slug, since the bundle treats placeholder as "no slug
 // available." Keeps the generic template safely non-functional.

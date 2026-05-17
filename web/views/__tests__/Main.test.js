@@ -194,7 +194,7 @@ describe('_handleUpgrade clipboard + operator-panel flow', () => {
 		render(React.createElement(FaceVaultKYC, makeProps({ user: OPERATOR, meta: BASE_META })));
 
 		await screen.findByText(/Plugin update available/);
-		fireEvent.click(screen.getByRole('button', { name: /Update now/i }));
+		fireEvent.click(screen.getByRole('button', { name: /Copy update URL/i }));
 
 		await waitFor(() =>
 			expect(window.open).toHaveBeenCalledWith(CHANGELOG, '_blank', 'noopener,noreferrer')
@@ -207,26 +207,28 @@ describe('_handleUpgrade clipboard + operator-panel flow', () => {
 		expect(fetchedUntrusted).toBe(false);
 	});
 
-	test('trusted URL copies the JSON and opens the Cloud operator path /admin/plugins', async () => {
-		const JSON_TEXT = '{"name":"facevault-kyc","version":20011}';
+	test('trusted URL: copies the install URL (not the JSON) and opens /admin/plugins', async () => {
+		const MKT_URL = 'https://facevault.id/plugins/facevault-kyc.marketplace.json';
 		global.fetch = mockFetch([
 			{
 				match: MANIFEST,
 				json: {
-					latest_version: '2.0.11',
-					marketplace_json_url: 'https://facevault.id/plugins/facevault-kyc.marketplace.json',
-					changelog_url: 'https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.11',
+					latest_version: '2.0.12',
+					marketplace_json_url: MKT_URL,
+					changelog_url: 'https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.12',
 				},
 			},
-			{ match: 'facevault.id/plugins/facevault-kyc.marketplace.json', text: JSON_TEXT },
 		]);
 		render(React.createElement(FaceVaultKYC, makeProps({ user: OPERATOR, meta: BASE_META })));
 
 		await screen.findByText(/Plugin update available/);
-		fireEvent.click(screen.getByRole('button', { name: /Update now/i }));
+		// The URL is shown selectable in the banner (clipboard-blocked fallback).
+		expect(screen.getByText(MKT_URL)).toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: /Copy update URL/i }));
 
+		// Copies the URL itself — NOT a fetched JSON body.
 		await waitFor(() =>
-			expect(window.navigator.clipboard.writeText).toHaveBeenCalledWith(JSON_TEXT)
+			expect(window.navigator.clipboard.writeText).toHaveBeenCalledWith(MKT_URL)
 		);
 		// jsdom origin is http://localhost; operator_path comes from meta.
 		expect(window.open).toHaveBeenCalledWith(
@@ -234,8 +236,11 @@ describe('_handleUpgrade clipboard + operator-panel flow', () => {
 			'_blank',
 			'noopener,noreferrer'
 		);
-		expect(
-			await screen.findByText(/New plugin JSON copied/i)
-		).toBeInTheDocument();
+		// The marketplace JSON must no longer be fetched (only the manifest).
+		const fetchedMkt = global.fetch.mock.calls.some(
+			(c) => String(c[0]).indexOf('/facevault-kyc.marketplace.json') !== -1
+		);
+		expect(fetchedMkt).toBe(false);
+		expect(await screen.findByText(/URL copied/i)).toBeInTheDocument();
 	});
 });

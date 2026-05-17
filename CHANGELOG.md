@@ -5,6 +5,35 @@ All notable changes to the FaceVault HollaEx plugin.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.0.12] — 2026-05-17
+
+### Changed
+
+- **Webview UI/UX redesign.** The verification panel is now a self-contained,
+  theme-locked card (owns its background, text colour, and font) so it
+  renders identically on a light or dark HollaEx kit instead of inheriting
+  unpredictable host styles. Stronger typographic hierarchy with explicit
+  colours (no more opacity-as-hierarchy), a gradient-stroked shield mark,
+  a neutral first-run status (a brand-new user no longer sees an alarming
+  red "Not Verified"), a three-step process row (Document → Face match →
+  Liveness) replacing the ghosted feature chips, a tactile gradient CTA
+  with hover/active/focus states, an animated "Identity verified" state,
+  and a security footer. Hover/motion come from a single scoped, injected
+  `<style>` (selectors namespaced under `.fvkyc-root`, keyframes gated
+  behind `prefers-reduced-motion`); all layout/colour remain inline so the
+  component still renders correctly if a strict host CSP blocks the tag.
+
+- **"Update now" copies the install URL, not the JSON.** HollaEx Cloud's
+  "Manually upgrade" dialog has no paste-JSON field — only "upload a JSON"
+  or "input url path". The banner now copies the marketplace JSON *URL*
+  (paste straight into the Input URL path field), shows that URL as
+  selectable text as a clipboard-blocked fallback, and still opens the
+  operator panel. No JSON is fetched client-side anymore. The
+  `isTrustedMarketplaceUrl` allowlist still gates it — arguably more
+  important now that the operator hands the URL to HollaEx's installer.
+
+- Webview bundle cache-buster bumped to `?v=10` (bundle changed).
+
 ## [v2.0.11] — 2026-05-17
 
 ### Added

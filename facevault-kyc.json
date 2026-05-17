@@ -1,6 +1,6 @@
 {
   "name": "facevault-kyc",
-  "version": 20011,
+  "version": 20012,
   "type": "external_kyc",
   "author": "FaceVault",
   "bio": "AI-powered identity verification.",
@@ -20,11 +20,11 @@
   },
   "web_view": [
     {
-      "src": "https://facevault.id/plugins/facevault-kyc-view.js?slug=configure-via-dashboard&v=9",
+      "src": "https://facevault.id/plugins/facevault-kyc-view.js?slug=configure-via-dashboard&v=10",
       "meta": {
         "is_verification_tab": true,
         "type": "home",
-        "installed_version": "2.0.11",
+        "installed_version": "2.0.12",
         "operator_path": "/admin/plugins",
         "string": {
           "id": "FACEVAULT_KYC_VERIFICATION"
