@@ -244,3 +244,57 @@ describe('_handleUpgrade clipboard + operator-panel flow', () => {
 		expect(await screen.findByText(/URL copied/i)).toBeInTheDocument();
 	});
 });
+
+describe('signed-poll token (postMessage from /done)', () => {
+	test('verify popup is opened WITH an opener — no noopener/noreferrer', async () => {
+		global.fetch = mockFetch([
+			{ match: MANIFEST, ok: false },
+			{ match: '/external_users/status', json: { status: 'in_progress' } },
+		]);
+		const user = { id: 42, id_data: {} }; // status 0 → CTA enabled
+		render(React.createElement(FaceVaultKYC, makeProps({ user: user, meta: BASE_META })));
+
+		const btn = await screen.findByRole('button', { name: /Verify My Identity/i });
+		fireEvent.click(btn);
+
+		// Named window, no noopener/noreferrer (so window.opener is set and the
+		// /v/<slug>/done page can postMessage the token back).
+		expect(window.open).toHaveBeenCalledWith(
+			expect.stringContaining('/v/acme'),
+			'fvkyc_verify',
+			'popup'
+		);
+		// The upgrade/changelog opens are untouched — still noopener,noreferrer
+		// (covered by the _handleUpgrade suite above).
+		await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+	});
+
+	test('hostile postMessages are ignored and never throw', async () => {
+		global.fetch = mockFetch([
+			{ match: MANIFEST, ok: false },
+			{ match: '/external_users/status', json: { status: 'in_progress' } },
+		]);
+		const fakePop = { name: 'fvkyc_verify' };
+		window.open = jest.fn(() => fakePop);
+		const user = { id: 42, id_data: {} };
+		render(React.createElement(FaceVaultKYC, makeProps({ user: user, meta: BASE_META })));
+
+		fireEvent.click(await screen.findByRole('button', { name: /Verify My Identity/i }));
+
+		// hostedBase resolves to https://facevault.id in jsdom (no hosted_base
+		// in BASE_META, no currentScript). Each of these must fail a gate and
+		// be silently ignored — and crucially never throw out of the handler.
+		const fire = (init) => window.dispatchEvent(new MessageEvent('message', init));
+		expect(() => {
+			fire({ data: { type: 'fv_poll_token', token: 'tok' }, origin: 'https://evil.example', source: fakePop }); // wrong origin
+			fire({ data: { type: 'fv_poll_token', token: 'tok' }, origin: 'https://facevault.id', source: {} });       // wrong source
+			fire({ data: { type: 'nope' }, origin: 'https://facevault.id', source: fakePop });                          // wrong type
+			fire({ data: { type: 'fv_poll_token', token: 'A'.repeat(2000) }, origin: 'https://facevault.id', source: fakePop }); // oversized
+			fire({ data: null, origin: 'https://facevault.id', source: fakePop });                                      // no data
+		}).not.toThrow();
+
+		// App is still alive (handler swallowed everything).
+		expect(screen.getByText('Identity Verification')).toBeInTheDocument();
+		await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+	});
+});

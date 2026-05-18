@@ -348,6 +348,9 @@ class FaceVaultKYC extends Component {
 		this._pollDeadline = 0;
 		this._consecutiveErrors = 0;
 		this._isMounted = false;
+		this._pollToken = null;   // signed fv_poll token, once delivered via postMessage
+		this._verifyPop = null;   // verify-popup handle, for e.source identity check
+		this._msgHandler = null;  // bound message listener; removed one-shot / on unmount
 		this._onVisibilityChange = this._onVisibilityChange.bind(this);
 	}
 
@@ -385,6 +388,7 @@ class FaceVaultKYC extends Component {
 	componentWillUnmount() {
 		this._isMounted = false;
 		this._stopPolling();
+		this._teardownPollTokenListener();
 		if (typeof document !== 'undefined' && document.removeEventListener) {
 			document.removeEventListener('visibilitychange', this._onVisibilityChange);
 		}
@@ -478,13 +482,25 @@ class FaceVaultKYC extends Component {
 
 	_pollOnce = async () => {
 		const cfg = resolveConfig(this.props);
-		if (!cfg.slug) return;
-		const ext = this._extId();
-		if (!ext) return;
-		try {
-			const url = cfg.apiBase + '/api/v1/external_users/status'
+		let url;
+		if (this._pollToken) {
+			// Signed-token path: bound to the unguessable session_id; the API
+			// ignores slug/ext here. Used once the /done popup delivered it.
+			url = cfg.apiBase + '/api/v1/external_users/status'
+				+ '?token=' + encodeURIComponent(this._pollToken);
+		} else {
+			// Legacy path — unchanged, and the automatic fallback: it keeps
+			// running from launch, so a popup that never delivers a token
+			// (old API, blocked/closed popup) still resolves via the existing
+			// (slug, external_user_id) poll for un-migrated tenants.
+			if (!cfg.slug) return;
+			const ext = this._extId();
+			if (!ext) return;
+			url = cfg.apiBase + '/api/v1/external_users/status'
 				+ '?slug=' + encodeURIComponent(cfg.slug)
 				+ '&external_user_id=' + encodeURIComponent(ext);
+		}
+		try {
 			const res = await fetch(url, { method: 'GET' });
 			if (!res.ok) {
 				this._consecutiveErrors += 1;
@@ -558,9 +574,41 @@ class FaceVaultKYC extends Component {
 
 	_launchVerify = (cfg) => {
 		const url = this._buildVerifyUrl(cfg);
-		window.open(url, '_blank', 'noopener,noreferrer');
+		// Open WITH an opener (named window, no noopener/noreferrer) so the
+		// hosted /v/<slug>/done page can postMessage the signed poll token
+		// back to us. The opened URL is our own trusted hostedBase origin
+		// (tight default-src 'self' CSP, only our nonce'd script) — same
+		// pattern as OAuth/Stripe popups. The upgrade/changelog window.opens
+		// are unchanged and keep noopener,noreferrer.
+		let expectedOrigin = null;
+		try { expectedOrigin = new URL(cfg.hostedBase).origin; } catch (_) {}
+		this._teardownPollTokenListener();          // tidy on repeat clicks
+		const pop = window.open(url, 'fvkyc_verify', 'popup');
+		this._verifyPop = pop;
+		const handler = (e) => {
+			try {
+				if (!expectedOrigin || e.origin !== expectedOrigin) return;
+				if (!pop || e.source !== pop) return;
+				const d = e.data;
+				if (!d || d.type !== 'fv_poll_token') return;
+				if (typeof d.token !== 'string' || !d.token || d.token.length >= 1024) return;
+				this._pollToken = d.token;
+				this._teardownPollTokenListener();  // one-shot
+			} catch (_) { /* never throw out of a message handler */ }
+		};
+		this._msgHandler = handler;
+		if (typeof window !== 'undefined' && window.addEventListener) {
+			window.addEventListener('message', handler);
+		}
 		this._safeSetState({ launched: true });
 		this._startPolling();
+	};
+
+	_teardownPollTokenListener = () => {
+		if (this._msgHandler && typeof window !== 'undefined' && window.removeEventListener) {
+			window.removeEventListener('message', this._msgHandler);
+		}
+		this._msgHandler = null;
 	};
 
 	_renderBanner(installed) {

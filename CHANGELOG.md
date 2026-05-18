@@ -5,6 +5,38 @@ All notable changes to the FaceVault HollaEx plugin.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.0.13] — 2026-05-18
+
+### Added
+
+- **Signed-poll token support.** The verify popup is now opened with an
+  opener (named `fvkyc_verify` window, no `noopener,noreferrer`) so the
+  FaceVault hosted `/v/<slug>/done` page can `postMessage` a short-lived,
+  session-bound `fv_poll_token` back to the plugin. A strictly gated,
+  one-shot `message` listener accepts it only when `e.origin` equals the
+  configured `hosted_base` origin, `e.source` is the exact popup handle,
+  `data.type === 'fv_poll_token'`, and the token is a string under 1 KB;
+  any failing check is ignored and never throws. Once held, status polling
+  uses `?token=` (bound to the unguessable session id) instead of the
+  guessable `?slug=&external_user_id=`, closing an unauthenticated
+  enumeration vector on the public status endpoint.
+
+### Changed
+
+- `_launchVerify` is the only `window.open` whose flags changed; the
+  upgrade/changelog `window.open`s keep `noopener,noreferrer`.
+
+### Compatibility
+
+- Fully backward compatible. The legacy `(slug, external_user_id)` poll
+  keeps running from launch and is the automatic fallback, so operators on
+  the old API/site — or any popup that never delivers a token (blocked,
+  closed early) — are unaffected. Operators re-paste the updated plugin
+  JSON once (same one-time action as the v2.0.8 icon fix).
+  `require_signed_poll` must not be enabled for a tenant until that tenant
+  has re-pasted this version and a verification has been confirmed
+  end-to-end on the `?token=` path.
+
 ## [v2.0.12] — 2026-05-17
 
 ### Changed
