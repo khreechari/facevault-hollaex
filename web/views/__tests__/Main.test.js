@@ -13,9 +13,10 @@
 
 require('@testing-library/jest-dom');
 const React = require('react');
-const { render, screen, fireEvent, waitFor, cleanup } = require('@testing-library/react');
+const { render, screen, fireEvent, waitFor, cleanup, act } = require('@testing-library/react');
 
 const FaceVaultKYC = require('../Main').default;
+const { __resetVerifyChannelForTests } = require('../Main');
 
 // Builds the props HollaEx pushes into the webview: web_view[0].meta lives
 // under webViews[id][i] keyed by plugin name (see findOwnMeta).
@@ -62,6 +63,9 @@ function mockFetch(routes) {
 const MANIFEST = '/integrations/hollaex/manifest';
 
 beforeEach(() => {
+	// The verify→token channel is module-scoped (survives a HollaEx remount
+	// in prod); reset it so each render starts from a clean world.
+	__resetVerifyChannelForTests();
 	window.sessionStorage.clear();
 	window.open = jest.fn();
 	Object.defineProperty(window.navigator, 'clipboard', {
@@ -74,6 +78,7 @@ beforeEach(() => {
 });
 
 afterEach(cleanup);
+afterEach(() => { jest.useRealTimers(); });
 
 describe('upgrade banner gating', () => {
 	test('does not render for a plain trading user even when an update exists', async () => {
@@ -296,5 +301,183 @@ describe('signed-poll token (postMessage from /done)', () => {
 		// App is still alive (handler swallowed everything).
 		expect(screen.getByText('Identity Verification')).toBeInTheDocument();
 		await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+	});
+});
+
+// Poll/token lifecycle — the prod failure surface (issues #1 + #2).
+// jsdom + fake timers drive the bounded poll loop deterministically.
+describe('poll + signed-token lifecycle', () => {
+	const VIEWER = { id: 42, id_data: {} }; // hxStatus 0 → CTA enabled
+
+	function routedFetch(handler) {
+		const calls = [];
+		const fn = jest.fn((url) => {
+			const u = String(url);
+			calls.push(u);
+			if (u.indexOf(MANIFEST) !== -1) {
+				return Promise.resolve({ ok: false, json: async () => ({}) });
+			}
+			return Promise.resolve({ ok: true, json: async () => handler(u) });
+		});
+		fn.calls = calls;
+		return fn;
+	}
+
+	// Advance the 3s poll cadence one cycle, flushing fetch→json microtasks.
+	async function pollCycle(n = 1) {
+		for (let i = 0; i < n; i++) {
+			// eslint-disable-next-line no-await-in-loop
+			await act(async () => { await jest.advanceTimersByTimeAsync(3100); });
+		}
+	}
+
+	test('#1: keeps polling through in_review and surfaces a later manual verdict without reload', async () => {
+		jest.useFakeTimers();
+		const seq = ['in_progress', 'in_review', 'in_review', 'in_review', 'failed'];
+		let i = 0;
+		global.fetch = routedFetch(() => ({ status: seq[Math.min(i++, seq.length - 1)] }));
+
+		render(React.createElement(FaceVaultKYC, makeProps({ user: VIEWER, meta: BASE_META })));
+		// componentDidMount auto-starts polling (slug + ext present) — no click.
+		await pollCycle(6);
+
+		// Saw in_review repeatedly but never stopped; resolved on the later
+		// manual 'failed' with no remount/reload.
+		expect(screen.getByText('Verification failed')).toBeInTheDocument();
+		const statusCalls = global.fetch.calls.filter(
+			(u) => u.indexOf('/external_users/status') !== -1
+		);
+		expect(statusCalls.length).toBeGreaterThanOrEqual(4); // polled past in_review
+	});
+
+	test('#2: a token arriving minutes after launch is consumed → switches to ?token=; legacy stays a fallback', async () => {
+		jest.useFakeTimers();
+		const fakePop = { closed: false };
+		window.open = jest.fn(() => fakePop);
+		// Legacy never resolves past in_review; only the token path passes.
+		global.fetch = routedFetch((u) =>
+			u.indexOf('token=') !== -1 ? { status: 'passed' } : { status: 'in_review' }
+		);
+
+		render(React.createElement(FaceVaultKYC, makeProps({ user: VIEWER, meta: BASE_META })));
+		fireEvent.click(screen.getByRole('button', { name: /Verify My Identity/i }));
+
+		await pollCycle(3);
+		// Legacy alone never resolves and never reached the token path.
+		expect(global.fetch.calls.some((u) => u.indexOf('token=') !== -1)).toBe(false);
+		expect(screen.queryByText('Verified by FaceVault')).not.toBeInTheDocument();
+
+		// /v/<slug>/done postMessages the signed token minutes later.
+		await act(async () => {
+			window.dispatchEvent(new MessageEvent('message', {
+				data: { type: 'fv_poll_token', token: 'SIGNED.JWT.AAA' },
+				origin: 'https://facevault.id',
+				source: fakePop,
+			}));
+			await Promise.resolve();
+		});
+		await pollCycle(3);
+
+		expect(global.fetch.calls.some((u) => u.indexOf('token=SIGNED.JWT.AAA') !== -1)).toBe(true);
+		expect(screen.getByText('Verified by FaceVault')).toBeInTheDocument();
+	});
+
+	test('#2: origin guard is exact — trailing-slash origin rejected, exact accepted', async () => {
+		jest.useFakeTimers();
+		const fakePop = { closed: false };
+		window.open = jest.fn(() => fakePop);
+		global.fetch = routedFetch((u) =>
+			u.indexOf('token=') !== -1 ? { status: 'passed' } : { status: 'in_review' }
+		);
+
+		render(React.createElement(FaceVaultKYC, makeProps({ user: VIEWER, meta: BASE_META })));
+		fireEvent.click(screen.getByRole('button', { name: /Verify My Identity/i }));
+		await pollCycle(1);
+
+		// https://facevault.id/ (trailing slash) !== the exact origin → ignored.
+		await act(async () => {
+			window.dispatchEvent(new MessageEvent('message', {
+				data: { type: 'fv_poll_token', token: 'BADORIGIN' },
+				origin: 'https://facevault.id/',
+				source: fakePop,
+			}));
+			await Promise.resolve();
+		});
+		await pollCycle(2);
+		expect(global.fetch.calls.some((u) => u.indexOf('token=') !== -1)).toBe(false);
+
+		// Exact origin → accepted.
+		await act(async () => {
+			window.dispatchEvent(new MessageEvent('message', {
+				data: { type: 'fv_poll_token', token: 'GOODORIGIN' },
+				origin: 'https://facevault.id',
+				source: fakePop,
+			}));
+			await Promise.resolve();
+		});
+		await pollCycle(2);
+		expect(global.fetch.calls.some((u) => u.indexOf('token=GOODORIGIN') !== -1)).toBe(true);
+	});
+
+	test('#2 (prod finding #4): a late token is consumed even if the poll loop had already exited', async () => {
+		jest.useFakeTimers();
+		const fakePop = { closed: false };
+		window.open = jest.fn(() => fakePop);
+		// Legacy resolves to a terminal 'failed' immediately → the loop
+		// STOPS (mirrors the prod case where polling had already exited
+		// before /done postMessaged the token). The token path passes.
+		global.fetch = routedFetch((u) =>
+			u.indexOf('token=') !== -1 ? { status: 'passed' } : { status: 'failed' }
+		);
+
+		render(React.createElement(FaceVaultKYC, makeProps({ user: VIEWER, meta: BASE_META })));
+		fireEvent.click(screen.getByRole('button', { name: /Verify My Identity/i }));
+		await pollCycle(3); // legacy → failed → _stopPolling(); loop is dead
+		expect(global.fetch.calls.some((u) => u.indexOf('token=') !== -1)).toBe(false);
+
+		// Token arrives after the loop exited — _onPollToken must revive it.
+		await act(async () => {
+			window.dispatchEvent(new MessageEvent('message', {
+				data: { type: 'fv_poll_token', token: 'REVIVE.AAA' },
+				origin: 'https://facevault.id',
+				source: fakePop,
+			}));
+			await Promise.resolve();
+		});
+		await pollCycle(3);
+		expect(global.fetch.calls.some((u) => u.indexOf('token=REVIVE.AAA') !== -1)).toBe(true);
+		expect(screen.getByText('Verified by FaceVault')).toBeInTheDocument();
+	});
+
+	test('#2: a token captured while the component is unmounted is re-adopted on remount', async () => {
+		jest.useFakeTimers();
+		const fakePop = { closed: false };
+		window.open = jest.fn(() => fakePop);
+		global.fetch = routedFetch((u) =>
+			u.indexOf('token=') !== -1 ? { status: 'passed' } : { status: 'in_review' }
+		);
+		const props = makeProps({ user: VIEWER, meta: BASE_META });
+
+		const { unmount } = render(React.createElement(FaceVaultKYC, props));
+		fireEvent.click(screen.getByRole('button', { name: /Verify My Identity/i }));
+		await pollCycle(1);
+
+		// HollaEx tears the webview down mid-flow.
+		unmount();
+		// /done postMessages AFTER unmount — the module channel listener is
+		// still alive and captures the token into _verifyChannel.token.
+		await act(async () => {
+			window.dispatchEvent(new MessageEvent('message', {
+				data: { type: 'fv_poll_token', token: 'LATELATE' },
+				origin: 'https://facevault.id',
+				source: fakePop,
+			}));
+			await Promise.resolve();
+		});
+
+		// Remount: componentDidMount must re-adopt the captured token.
+		render(React.createElement(FaceVaultKYC, props));
+		await pollCycle(3);
+		expect(global.fetch.calls.some((u) => u.indexOf('token=LATELATE') !== -1)).toBe(true);
 	});
 });

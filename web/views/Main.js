@@ -333,6 +333,83 @@ const POLL_ERROR_BACKOFF_CAP_MS = 30 * 1000;
 // on stale versions see an upgrade banner above the verify button.
 const MANIFEST_PATH = '/api/v1/integrations/hollaex/manifest';
 
+// Verify→token channel, MODULE-SCOPED on purpose. HollaEx can re-render
+// (unmount/remount) the plugin webview while the verify popup is still open
+// — a real KYC runs for minutes (liveness retries) and the hosted /v/<slug>
+// /done page postMessages the signed fv_poll token only at the very end. If
+// the listener lived on the React instance it would die on remount and the
+// late token would be lost (the prod failure: token delivered to the opener,
+// 0 ?token= polls). Keeping the popup handle + the single 'message' listener
+// here means they live for the ENTIRE life of one popup, across remounts,
+// and e.source can stay strictly === the original window.open() handle.
+//
+// The listener is installed at launch and removed ONLY when a token is
+// captured (one-shot) or the popup closes with no token. Never on a timer,
+// the legacy-fallback, visibility/blur, step changes, or component unmount.
+const _verifyChannel = {
+	pop: null,             // window.open() handle (persists across remounts)
+	expectedOrigin: null,  // exact hosted origin, e.g. https://facevault.id
+	token: null,           // captured fv_poll token (read by the live instance)
+	listener: null,        // the single window 'message' handler
+	closeTimer: null,      // interval watching pop.closed (NOT a teardown timer)
+	onToken: null,         // live instance's callback, set on mount/launch
+};
+
+function _teardownVerifyChannel() {
+	try {
+		if (_verifyChannel.listener && typeof window !== 'undefined' && window.removeEventListener) {
+			window.removeEventListener('message', _verifyChannel.listener);
+		}
+	} catch (_) { /* ignore */ }
+	_verifyChannel.listener = null;
+	if (_verifyChannel.closeTimer) {
+		clearInterval(_verifyChannel.closeTimer);
+		_verifyChannel.closeTimer = null;
+	}
+}
+
+// Open the channel for ONE verify popup. Idempotent: a repeat launch tears
+// the previous one down first. Guards are unchanged from the proven-correct
+// v2.0.13 set (exact origin, exact popup handle, type, <1KB string) — only
+// their *lifetime* changes.
+function _openVerifyChannel(pop, expectedOrigin) {
+	_teardownVerifyChannel();
+	_verifyChannel.pop = pop;
+	_verifyChannel.expectedOrigin = expectedOrigin;
+	_verifyChannel.token = null;
+	const listener = (e) => {
+		try {
+			if (!_verifyChannel.expectedOrigin || e.origin !== _verifyChannel.expectedOrigin) return;
+			if (!_verifyChannel.pop || e.source !== _verifyChannel.pop) return;
+			const d = e.data;
+			if (!d || d.type !== 'fv_poll_token') return;
+			if (typeof d.token !== 'string' || !d.token || d.token.length >= 1024) return;
+			_verifyChannel.token = d.token;
+			const cb = _verifyChannel.onToken;
+			_teardownVerifyChannel();   // one-shot — ONLY after a real capture
+			if (cb) { try { cb(d.token); } catch (_) { /* never throw */ } }
+		} catch (_) { /* never throw out of a message handler */ }
+	};
+	_verifyChannel.listener = listener;
+	if (typeof window !== 'undefined' && window.addEventListener) {
+		window.addEventListener('message', listener);
+	}
+	// Popup closed WITHOUT a token → the channel's job is done and the
+	// already-running legacy poll becomes the sole, true fallback. This
+	// watcher only ends the channel on a genuine close, never pre-empts a
+	// late token.
+	if (typeof setInterval !== 'undefined') {
+		_verifyChannel.closeTimer = setInterval(function () {
+			try {
+				if (_verifyChannel.token) return;
+				if (_verifyChannel.pop && _verifyChannel.pop.closed) {
+					_teardownVerifyChannel();
+				}
+			} catch (_) { /* ignore */ }
+		}, 2000);
+	}
+}
+
 class FaceVaultKYC extends Component {
 	constructor(props) {
 		super(props);
@@ -349,9 +426,8 @@ class FaceVaultKYC extends Component {
 		this._consecutiveErrors = 0;
 		this._isMounted = false;
 		this._pollToken = null;   // signed fv_poll token, once delivered via postMessage
-		this._verifyPop = null;   // verify-popup handle, for e.source identity check
-		this._msgHandler = null;  // bound message listener; removed one-shot / on unmount
 		this._onVisibilityChange = this._onVisibilityChange.bind(this);
+		this._onPollToken = this._onPollToken.bind(this);
 	}
 
 	// Setting state on an unmounted component logs a React warning and
@@ -367,7 +443,18 @@ class FaceVaultKYC extends Component {
 		// a previous page load (user closed + reopened this tab) or from a
 		// different device. Polling auto-stops on terminal state.
 		const cfg = resolveConfig(this.props);
-		if (cfg.slug && this._extId()) {
+		// Re-adopt an in-flight verify across a HollaEx remount. The
+		// module-scoped channel kept the popup + listener alive while this
+		// component was torn down: pick up a token it already captured, or
+		// register THIS instance to receive one that arrives later. Without
+		// this, a remount mid-flow permanently loses the late token.
+		if (_verifyChannel.token) {
+			this._pollToken = _verifyChannel.token;
+		} else if (_verifyChannel.listener) {
+			this.setState({ launched: true });
+			_verifyChannel.onToken = this._onPollToken;
+		}
+		if ((cfg.slug && this._extId()) || this._pollToken) {
 			this._startPolling();
 		}
 		// Upgrade-banner data fetch — gated on slug only, NOT on operator
@@ -388,7 +475,13 @@ class FaceVaultKYC extends Component {
 	componentWillUnmount() {
 		this._isMounted = false;
 		this._stopPolling();
-		this._teardownPollTokenListener();
+		// Deliberately do NOT tear down _verifyChannel here — it must outlive
+		// this component so a remount can re-adopt the in-flight verify. Just
+		// detach our callback so a late token doesn't fire into a dead
+		// instance; the channel still stores the token for the next mount.
+		if (_verifyChannel.onToken === this._onPollToken) {
+			_verifyChannel.onToken = null;
+		}
 		if (typeof document !== 'undefined' && document.removeEventListener) {
 			document.removeEventListener('visibilitychange', this._onVisibilityChange);
 		}
@@ -402,11 +495,25 @@ class FaceVaultKYC extends Component {
 		if (typeof document === 'undefined') return;
 		if (document.hidden) {
 			if (this._pollTimer) {
+				clearTimeout(this._pollTimer);
 				clearInterval(this._pollTimer);
 				this._pollTimer = null;
 			}
-		} else if (!this._pollTimer && this._pollDeadline > Date.now()) {
+			return;
+		}
+		// Foregrounded. Resume only if the verdict isn't final yet. If the
+		// bounded poll window lapsed while we were hidden, start a fresh one
+		// so a manual review decided while we were backgrounded still
+		// surfaces without a manual reload.
+		const fv = this.state.fvStatus;
+		if (fv === 'passed' || fv === 'failed') return;
+		const cfg = resolveConfig(this.props);
+		if (!this._pollToken && !(cfg.slug && this._extId())) return;
+		if (this._pollTimer) return;
+		if (this._pollDeadline > Date.now()) {
 			this._scheduleNextPoll(POLL_INTERVAL_MS);
+		} else {
+			this._startPolling();
 		}
 	}
 
@@ -510,8 +617,19 @@ class FaceVaultKYC extends Component {
 			this._consecutiveErrors = 0;
 			if (data && data.status) {
 				this._safeSetState({ fvStatus: data.status });
-				if (data.status === 'passed' || data.status === 'failed' || data.status === 'in_review') {
+				// in_review is NOT terminal for the end user: a human reviewer
+				// can still flip it to passed/failed. Keep polling through it
+				// (bounded by POLL_TIMEOUT_MS + backoff) so a manual verdict
+				// reaches the user without a reload. Stop ONLY on a truly
+				// final external state.
+				if (data.status === 'passed' || data.status === 'failed') {
 					this._stopPolling();
+					// Verify fully resolved — release the module channel so a
+					// later unrelated remount can't re-adopt a spent token.
+					if (_verifyChannel.token) {
+						_teardownVerifyChannel();
+						_verifyChannel.token = null;
+					}
 				}
 			}
 		} catch (_) {
@@ -580,36 +698,35 @@ class FaceVaultKYC extends Component {
 		// (tight default-src 'self' CSP, only our nonce'd script) — same
 		// pattern as OAuth/Stripe popups. The upgrade/changelog window.opens
 		// are unchanged and keep noopener,noreferrer.
+		//
+		// expectedOrigin is the EXACT hosted origin: new URL(hostedBase)
+		// .origin normalises any path/trailing slash to e.g.
+		// "https://facevault.id" (no slash) — exactly the origin the real
+		// /done postMessage carries. Stays null if unparseable so the guard
+		// never compares against ''/null.
 		let expectedOrigin = null;
 		try { expectedOrigin = new URL(cfg.hostedBase).origin; } catch (_) {}
-		this._teardownPollTokenListener();          // tidy on repeat clicks
 		const pop = window.open(url, 'fvkyc_verify', 'popup');
-		this._verifyPop = pop;
-		const handler = (e) => {
-			try {
-				if (!expectedOrigin || e.origin !== expectedOrigin) return;
-				if (!pop || e.source !== pop) return;
-				const d = e.data;
-				if (!d || d.type !== 'fv_poll_token') return;
-				if (typeof d.token !== 'string' || !d.token || d.token.length >= 1024) return;
-				this._pollToken = d.token;
-				this._teardownPollTokenListener();  // one-shot
-			} catch (_) { /* never throw out of a message handler */ }
-		};
-		this._msgHandler = handler;
-		if (typeof window !== 'undefined' && window.addEventListener) {
-			window.addEventListener('message', handler);
-		}
+		// Listener + popup handle live on the module-scoped channel so they
+		// survive a HollaEx remount and the full multi-minute flow; e.source
+		// stays strictly === this exact handle.
+		_openVerifyChannel(pop, expectedOrigin);
+		_verifyChannel.onToken = this._onPollToken;
 		this._safeSetState({ launched: true });
 		this._startPolling();
 	};
 
-	_teardownPollTokenListener = () => {
-		if (this._msgHandler && typeof window !== 'undefined' && window.removeEventListener) {
-			window.removeEventListener('message', this._msgHandler);
-		}
-		this._msgHandler = null;
-	};
+	// Called (once) when the channel captures the signed token — possibly
+	// minutes after launch, possibly after the legacy poll already settled
+	// on in_review. _pollOnce reads this._pollToken first, so a running loop
+	// switches to ?token= on its next tick; if the loop had stopped or never
+	// started, _startPolling revives it. This is the fix for "token received
+	// but never consumed → 0 ?token= polls".
+	_onPollToken(token) {
+		this._pollToken = token;
+		if (!this._isMounted) return;
+		this._startPolling();
+	}
 
 	_renderBanner(installed) {
 		const { manifest, updateCopied, upgradeInFlight } = this.state;
@@ -853,6 +970,19 @@ class FaceVaultKYCErrorBoundary extends Component {
 		}
 		return <FaceVaultKYC {...this.props} />;
 	}
+}
+
+// Test-only: reset the module-scoped verify channel between cases. The
+// channel deliberately outlives a React unmount in production (it must
+// survive a HollaEx mid-flow remount), so unit tests that render repeatedly
+// need an explicit reset for isolation. Not referenced by the bundle at
+// runtime.
+export function __resetVerifyChannelForTests() {
+	_teardownVerifyChannel();
+	_verifyChannel.pop = null;
+	_verifyChannel.expectedOrigin = null;
+	_verifyChannel.token = null;
+	_verifyChannel.onToken = null;
 }
 
 export default FaceVaultKYCErrorBoundary;
