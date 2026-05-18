@@ -5,7 +5,38 @@ All notable changes to the FaceVault HollaEx plugin.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [v2.0.13] — 2026-05-18
+## [v2.0.14] — 2026-05-18
+
+### Fixed
+
+- **Manual-review verdicts now reach the user without a reload.** The status
+  poller treated `in_review` as terminal and stopped; a later
+  reviewer accept/reject was never re-fetched, so the webview showed
+  "Under review" forever unless the user manually reloaded. `in_review`
+  is no longer terminal — the poll loop continues through it (still
+  bounded by the 30-min deadline + error backoff, paused on
+  `document.hidden`) and stops only on a truly final `passed`/`failed`.
+  On visibility regain it restarts a fresh bounded window if the previous
+  one lapsed, so a verdict decided while the tab was backgrounded still
+  surfaces.
+- **Signed-poll token is now actually consumed.** Across real HollaEx
+  KYC the `fv_poll_token` postMessage was delivered to the opener and
+  passed every guard, but the bundle never switched to `?token=` (it
+  polled legacy `?slug=` and stopped at `in_review`). Two causes fixed:
+  (1) the token-capture `message` listener and the popup handle now live
+  on a module-scoped channel that survives a HollaEx mid-flow
+  unmount/remount of the webview (instead of dying with the React
+  instance and never re-arming) — so it stays installed for the entire
+  life of the verify popup, torn down only on token capture or popup
+  close, never on a timer/visibility/step change; (2) on token receipt
+  the poll loop is (re)started so the token is consumed even if the loop
+  had already exited. `e.origin` is matched exactly against the hosted
+  origin and `e.source` stays strictly the original `window.open()`
+  handle (preserved across remounts by the module channel). Legacy
+  `(slug, external_user_id)` polling remains a true fallback only —
+  used when no token ever arrives.
+
+
 
 ### Added
 
