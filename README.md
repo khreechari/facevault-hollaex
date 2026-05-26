@@ -63,8 +63,10 @@ The webview self-checks for plugin updates. On every render it fetches
 and compares the released `latest_version` against the `installed_version`
 baked into your JSON's `web_view[0].meta`. When the installed JSON is behind:
 
-- **Admin users** (HollaEx `user.is_admin === true`) see an upgrade banner
-  above the verify button: *"Plugin update available — vX.Y.Z"*.
+- **Operators / admins** see an upgrade banner above the verify button:
+  *"Plugin update available — vX.Y.Z"*. They're detected via HollaEx
+  `user.is_admin === true`, or — on HollaEx Cloud, which exposes no `is_admin`
+  flag — a role whose `user.permissions` include an `/admin/…` entry.
 - **Regular exchange users** see nothing change.
 
 Clicking **Update now** fetches the latest marketplace JSON from the GitHub
@@ -111,7 +113,7 @@ export default {
   async fetch(request, env) {
     if (request.method !== 'POST') return new Response('method not allowed', { status: 405 });
 
-    const sig = request.headers.get('x-signature') || '';
+    const sig = request.headers.get('x-facevault-signature') || '';
     const raw = await request.text();
     if (!(await verifyHmac(env.FV_WEBHOOK_SECRET, raw, sig))) {
       return new Response('bad signature', { status: 401 });
