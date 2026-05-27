@@ -1,5 +1,7 @@
 # FaceVault KYC Plugin for HollaEx
 
+[![CI](https://github.com/khreechari/facevault-hollaex/actions/workflows/ci.yml/badge.svg)](https://github.com/khreechari/facevault-hollaex/actions/workflows/ci.yml)
+
 AI-powered identity verification for HollaEx-powered exchanges. Replace manual KYC review or cloud providers (Sumsub, iDenfy, Onfido) with FaceVault — flat pricing, no annual contracts, self-hosted option for enterprise.
 
 - [Integration guide](https://facevault.id/integrations)

@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      # All third-party actions are SHA-pinned per supply-chain best practice:
+      # tag references can be repointed (or hijacked via npm-style typosquats),
+      # commit SHAs cannot. Comments record the human-readable version next to
+      # each SHA so dependabot/renovate-style bumps stay reviewable.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: '20'
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Run tests (with coverage gate)
+        run: npm run test:coverage
+
+      - name: Build plugin JSONs
+        run: |
+          node build.js
+          node build.js --marketplace
+
+      - name: Build webview bundle
+        run: npx webpack

@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # Keep the SHA-pinned GitHub Actions in CI / release workflows current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Plugin source + build tooling — keep webpack, jest, and loader deps patched.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
