@@ -148,20 +148,15 @@ export default {
 };
 
 async function verifyHmac(secret, body, hexSig) {
-  // FaceVault signs compact JSON with recursively sorted keys (sha256-hex).
-  const sorted = JSON.stringify(sortKeys(JSON.parse(body)));
+  // FaceVault signs the exact bytes it sends (sha256-hex). HMAC the RAW body —
+  // do not JSON.parse + re-stringify, which can change the bytes (non-ASCII
+  // escaping, number formatting) and reject valid webhooks.
   const key = await crypto.subtle.importKey(
     'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
   );
-  const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(sorted));
+  const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body));
   const expected = [...new Uint8Array(mac)].map(b => b.toString(16).padStart(2, '0')).join('');
   return expected === hexSig;
-}
-
-function sortKeys(o) {
-  if (o === null || typeof o !== 'object') return o;
-  if (Array.isArray(o)) return o.map(sortKeys);
-  return Object.keys(o).sort().reduce((acc, k) => { acc[k] = sortKeys(o[k]); return acc; }, {});
 }
 ```
 
