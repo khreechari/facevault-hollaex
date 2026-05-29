@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  check:
+  test:
     runs-on: ubuntu-latest
     steps:
       # All third-party actions are SHA-pinned per supply-chain best practice:
