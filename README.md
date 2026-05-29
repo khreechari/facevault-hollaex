@@ -150,13 +150,24 @@ export default {
 async function verifyHmac(secret, body, hexSig) {
   // FaceVault signs the exact bytes it sends (sha256-hex). HMAC the RAW body —
   // do not JSON.parse + re-stringify, which can change the bytes (non-ASCII
-  // escaping, number formatting) and reject valid webhooks.
+  // escaping, number formatting) and reject valid webhooks. The final
+  // comparison is constant-time (XOR loop, never short-circuits) so an
+  // attacker can't probe the expected signature byte-by-byte via response
+  // timing. If you're on a Node/Express stack instead of a Worker, prefer
+  // `import { verifySignature } from 'facevault'` from the published npm
+  // package — same crypto, same constant-time guarantee, one line.
+  if (typeof hexSig !== 'string' || hexSig.length === 0) return false;
   const key = await crypto.subtle.importKey(
     'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
   );
   const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body));
   const expected = [...new Uint8Array(mac)].map(b => b.toString(16).padStart(2, '0')).join('');
-  return expected === hexSig;
+  if (expected.length !== hexSig.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) {
+    diff |= expected.charCodeAt(i) ^ hexSig.charCodeAt(i);
+  }
+  return diff === 0;
 }
 ```
 

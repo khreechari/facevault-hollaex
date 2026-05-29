@@ -68,6 +68,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   has re-pasted this version and a verification has been confirmed
   end-to-end on the `?token=` path.
 
+## [v2.0.13] — 2026-05-18
+
+### Added
+
+- **Signed-poll token: initial implementation.** `_launchVerify` now opens the
+  verify popup as a *named* window with no `noopener,noreferrer` so the
+  FaceVault hosted `/v/<slug>/done` page can `postMessage` a short-lived,
+  session-bound `fv_poll_token` back to the plugin. A strictly gated, one-shot
+  `message` listener accepts it only when `e.origin === new URL(hosted_base).origin`,
+  `e.source === ` the original popup handle, `data.type === 'fv_poll_token'`,
+  and the token is a string under 1 KB; any failing check is ignored and
+  never throws. Status polling switches to `?token=` (bound to the
+  unguessable session id) instead of the guessable
+  `?slug=&external_user_id=`, closing an unauthenticated enumeration vector
+  on the public status endpoint.
+
+### Changed
+
+- Only `_launchVerify`'s `window.open` changed; the upgrade/changelog
+  `window.open`s keep `noopener,noreferrer`.
+- Webview bundle cache-buster bumped to `?v=11` (bundle changed).
+
+### Compatibility
+
+- Fully backward compatible. Legacy `(slug, external_user_id)` polling
+  remains a timer-free fallback from launch — un-migrated operators and any
+  popup that never delivers a token are unaffected. Operators re-paste the
+  plugin JSON once.
+
+### Tests
+
+- 2 render tests added (popup flags + hostile-message no-throw). 58/58
+  Jest pass.
+
+### Known issues fixed in v2.0.14
+
+The v2.0.13 implementation had two bugs that kept the signed-poll path from
+working end-to-end on real HollaEx KYC; both are fixed in v2.0.14. Operators
+upgrading from v2.0.12 should jump straight to v2.0.14.
+
 ## [v2.0.12] — 2026-05-17
 
 ### Changed
@@ -348,6 +388,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Webapp URL pattern (`?sid=&st=`) and a build.js regression that produced
   a malformed JSON for non-dashboard installs.
 
+[v2.0.14]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.14
+[v2.0.13]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.13
+[v2.0.12]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.12
+[v2.0.11]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.11
+[v2.0.10]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.10
+[v2.0.9]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.9
+[v2.0.8]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.8
 [v2.0.7]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.7
 [v2.0.6]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.6
 [v2.0.5]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.5
