@@ -388,19 +388,19 @@ upgrading from v2.0.12 should jump straight to v2.0.14.
 - Webapp URL pattern (`?sid=&st=`) and a build.js regression that produced
   a malformed JSON for non-dashboard installs.
 
-[v2.0.14]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.14
-[v2.0.13]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.13
-[v2.0.12]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.12
-[v2.0.11]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.11
-[v2.0.10]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.10
-[v2.0.9]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.9
-[v2.0.8]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.8
-[v2.0.7]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.7
-[v2.0.6]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.6
-[v2.0.5]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.5
-[v2.0.4]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.4
-[v2.0.3]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.3
-[v2.0.2]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.2
-[v2.0.1]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.1
-[v2.0.0]: https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.0
-[v1.0.1]: https://github.com/khreechari/facevault-hollaex/releases/tag/v1.0.1
+[v2.0.14]: https://github.com/kaditham-technologies/facevault-hollaex/releases/tag/v2.0.14
+[v2.0.13]: https://github.com/kaditham-technologies/facevault-hollaex/releases/tag/v2.0.13
+[v2.0.12]: https://github.com/kaditham-technologies/facevault-hollaex/releases/tag/v2.0.12
+[v2.0.11]: https://github.com/kaditham-technologies/facevault-hollaex/releases/tag/v2.0.11
+[v2.0.10]: https://github.com/kaditham-technologies/facevault-hollaex/releases/tag/v2.0.10
+[v2.0.9]: https://github.com/kaditham-technologies/facevault-hollaex/releases/tag/v2.0.9
+[v2.0.8]: https://github.com/kaditham-technologies/facevault-hollaex/releases/tag/v2.0.8
+[v2.0.7]: https://github.com/kaditham-technologies/facevault-hollaex/releases/tag/v2.0.7
+[v2.0.6]: https://github.com/kaditham-technologies/facevault-hollaex/releases/tag/v2.0.6
+[v2.0.5]: https://github.com/kaditham-technologies/facevault-hollaex/releases/tag/v2.0.5
+[v2.0.4]: https://github.com/kaditham-technologies/facevault-hollaex/releases/tag/v2.0.4
+[v2.0.3]: https://github.com/kaditham-technologies/facevault-hollaex/releases/tag/v2.0.3
+[v2.0.2]: https://github.com/kaditham-technologies/facevault-hollaex/releases/tag/v2.0.2
+[v2.0.1]: https://github.com/kaditham-technologies/facevault-hollaex/releases/tag/v2.0.1
+[v2.0.0]: https://github.com/kaditham-technologies/facevault-hollaex/releases/tag/v2.0.0
+[v1.0.1]: https://github.com/kaditham-technologies/facevault-hollaex/releases/tag/v1.0.1

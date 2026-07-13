@@ -1,6 +1,6 @@
 # FaceVault KYC Plugin for HollaEx
 
-[![CI](https://github.com/khreechari/facevault-hollaex/actions/workflows/ci.yml/badge.svg)](https://github.com/khreechari/facevault-hollaex/actions/workflows/ci.yml)
+[![CI](https://github.com/kaditham-technologies/facevault-hollaex/actions/workflows/ci.yml/badge.svg)](https://github.com/kaditham-technologies/facevault-hollaex/actions/workflows/ci.yml)
 
 AI-powered identity verification for HollaEx-powered exchanges. Replace manual KYC review or cloud providers (Sumsub, iDenfy, Onfido) with FaceVault — flat pricing, no annual contracts, self-hosted option for enterprise.
 
@@ -50,7 +50,7 @@ If you installed FaceVault from HollaEx's App Store — or want the generic JSON
 
 Direct download (latest):
 
-- [`facevault-kyc.marketplace.json`](https://github.com/khreechari/facevault-hollaex/releases/latest/download/facevault-kyc.marketplace.json) — always points at the latest release. Also mirrored at [`facevault.id/facevault-kyc.marketplace.json`](https://facevault.id/facevault-kyc.marketplace.json).
+- [`facevault-kyc.marketplace.json`](https://github.com/kaditham-technologies/facevault-hollaex/releases/latest/download/facevault-kyc.marketplace.json) — always points at the latest release. Also mirrored at [`facevault.id/facevault-kyc.marketplace.json`](https://facevault.id/facevault-kyc.marketplace.json).
 
 After installing it in HollaEx:
 
@@ -176,7 +176,7 @@ Point your FaceVault site's webhook URL at this Worker. Verifications that compl
 ## Building from source
 
 ```bash
-git clone https://github.com/khreechari/facevault-hollaex.git
+git clone https://github.com/kaditham-technologies/facevault-hollaex.git
 cd facevault-hollaex
 npm install
 node build.js               # facevault-kyc.json (generic template)
@@ -190,7 +190,7 @@ The dashboard-baked JSON (Option A) is the preferred path for most operators —
 
 - Email: [support@facevault.id](mailto:support@facevault.id)
 - Docs: [facevault.id/docs](https://facevault.id/docs)
-- Issues: [github.com/khreechari/facevault-hollaex/issues](https://github.com/khreechari/facevault-hollaex/issues)
+- Issues: [github.com/kaditham-technologies/facevault-hollaex/issues](https://github.com/kaditham-technologies/facevault-hollaex/issues)
 
 ## License
 

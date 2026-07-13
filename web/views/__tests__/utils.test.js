@@ -209,7 +209,7 @@ describe('readInstalledVersion', () => {
 describe('isTrustedMarketplaceUrl', () => {
 	test('accepts github.com release URLs', () => {
 		expect(isTrustedMarketplaceUrl(
-			'https://github.com/khreechari/facevault-hollaex/releases/download/v2.0.5/facevault-kyc.marketplace.json'
+			'https://github.com/kaditham-technologies/facevault-hollaex/releases/download/v2.0.5/facevault-kyc.marketplace.json'
 		)).toBe(true);
 	});
 	test('accepts facevault.id URLs', () => {
@@ -219,7 +219,7 @@ describe('isTrustedMarketplaceUrl', () => {
 	});
 	test('rejects look-alike host', () => {
 		expect(isTrustedMarketplaceUrl(
-			'https://github.com.evil.com/khreechari/facevault-hollaex/'
+			'https://github.com.evil.com/kaditham-technologies/facevault-hollaex/'
 		)).toBe(false);
 	});
 	test('rejects http:// (must be https)', () => {

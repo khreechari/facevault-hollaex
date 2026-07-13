@@ -20,7 +20,7 @@ of rigour to keep it stable.
 ## Local development
 
 ```bash
-git clone https://github.com/khreechari/facevault-hollaex.git
+git clone https://github.com/kaditham-technologies/facevault-hollaex.git
 cd facevault-hollaex
 npm install
 npm test            # runs the Jest suite

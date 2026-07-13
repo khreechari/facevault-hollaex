@@ -185,7 +185,7 @@ describe('error boundary', () => {
 
 describe('_handleUpgrade clipboard + operator-panel flow', () => {
 	test('refuses an untrusted marketplace_json_url and falls back to the changelog', async () => {
-		const CHANGELOG = 'https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.11';
+		const CHANGELOG = 'https://github.com/kaditham-technologies/facevault-hollaex/releases/tag/v2.0.11';
 		global.fetch = mockFetch([
 			{
 				match: MANIFEST,
@@ -220,7 +220,7 @@ describe('_handleUpgrade clipboard + operator-panel flow', () => {
 				json: {
 					latest_version: '2.0.12',
 					marketplace_json_url: MKT_URL,
-					changelog_url: 'https://github.com/khreechari/facevault-hollaex/releases/tag/v2.0.12',
+					changelog_url: 'https://github.com/kaditham-technologies/facevault-hollaex/releases/tag/v2.0.12',
 				},
 			},
 		]);

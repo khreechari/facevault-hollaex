@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security vulnerability
-    url: https://github.com/khreechari/facevault-hollaex/security/policy
+    url: https://github.com/kaditham-technologies/facevault-hollaex/security/policy
     about: Do not file security issues publicly — see SECURITY.md and email security@facevault.id.
   - name: Integration help / docs
     url: https://facevault.id/integrations
